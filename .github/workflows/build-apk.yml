@@ -10,6 +10,7 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -28,6 +29,9 @@ jobs:
       - name: Install dependencies
         run: npm install --legacy-peer-deps
 
+      - name: Add Android platform
+        run: npx cap add android
+
       - name: Build web app
         run: npm run build
 
@@ -45,4 +49,3 @@ jobs:
         with:
           name: VEER-Android-APK
           path: android/app/build/outputs/apk/debug/app-debug.apk
-          
