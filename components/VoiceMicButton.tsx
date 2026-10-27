@@ -1,4 +1,3 @@
-
 import React, { useEffect, useRef } from 'react';
 
 type VoiceMicButtonProps = {
@@ -21,7 +20,7 @@ export function VoiceMicButton({
   isSpeaking = false,
   onClick,
   disabled = false,
-  autoListenTrigger,
+  autoListenTrigger = 0,
   continuousModeEnabled = false,
   onStopPlayback,
   onToggleContinuousMode,
@@ -31,6 +30,7 @@ export function VoiceMicButton({
   useEffect(() => {
     if (previousTrigger.current !== autoListenTrigger) {
       previousTrigger.current = autoListenTrigger;
+
       if (continuousModeEnabled && !isLoading && !isSpeaking) {
         onClick();
       }
@@ -44,10 +44,13 @@ export function VoiceMicButton({
   ]);
 
   const handleClick = () => {
+    if (disabled || isLoading) return;
+
     if (isSpeaking) {
       onStopPlayback?.();
       return;
     }
+
     onClick();
   };
 
@@ -97,7 +100,9 @@ export function VoiceMicButton({
           color: '#ffffff',
         }}
       >
-        {continuousModeEnabled ? 'लगातार सुनना चालू' : 'लगातार सुनना बंद'}
+        {continuousModeEnabled
+          ? 'लगातार सुनना चालू'
+          : 'लगातार सुनना बंद'}
       </button>
     </div>
   );
