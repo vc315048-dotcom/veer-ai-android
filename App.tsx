@@ -8,10 +8,10 @@ import { AndroidHeader } from './components/AndroidHeader';
 import { ChatArea } from './components/ChatArea';
 import { VoiceMicButton } from './components/VoiceMicButton';
 import { SettingsModal } from './components/SettingsModal';
-import { ChatMessage, VoiceSettings } from './types';
-import { speechManager } from './utils/speechManager';
-import { soundFx } from './utils/soundEffects';
-import { detectVoiceCommand } from './utils/voiceCommands';
+import { ChatMessage, VoiceSettings } from './types'
+import { speechManager } from './speechManager'
+import { soundFx } from './soundEffects';
+import { detectVoiceCommand } from './voiceCommands';
 
 const STORAGE_KEY_MESSAGES = 'veer_messages_v1';
 const STORAGE_KEY_SETTINGS = 'veer_settings_v1';
