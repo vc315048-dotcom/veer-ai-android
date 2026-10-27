@@ -1,7 +1,7 @@
 import React from 'react';
 import { X, Volume2, Gauge, Music, Trash2, Shield, Info, Sparkles, Mic } from 'lucide-react';
 import { VoiceSettings } from '../types';
-import { soundFx } from '../utils/soundEffects';
+import { soundFx } from '../soundEffects';
 
 interface SettingsModalProps {
   isOpen: boolean;
