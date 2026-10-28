@@ -5,6 +5,8 @@
  */
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { Capacitor } from '@capacitor/core';
+import { SpeechRecognition } from '@capgo/capacitor-speech-recognition';
 import { AndroidHeader } from './components/AndroidHeader';
 import { ChatArea } from './components/ChatArea';
 import { VoiceMicButton } from './components/VoiceMicButton';
@@ -585,7 +587,7 @@ export default function App() {
     }
   };
 
-  const handleMicClick = useCallback(() => {
+  const handleMicClick = useCallback(async () => {
     if (loadingRef.current) return;
 
     if (isSpeaking) {
@@ -593,9 +595,14 @@ export default function App() {
       return;
     }
 
+    // Stop an active native or browser recognition session.
     if (isListening) {
       try {
-        recognitionRef.current?.stop?.();
+        if (Capacitor.isNativePlatform()) {
+          await SpeechRecognition.stop();
+        } else {
+          recognitionRef.current?.stop?.();
+        }
       } catch (error) {
         console.warn('[VEER] Could not stop microphone:', error);
       }
@@ -606,14 +613,91 @@ export default function App() {
       return;
     }
 
+    // Capacitor Android/iOS: use the native speech-recognition plugin.
+    if (Capacitor.isNativePlatform()) {
+      const session = {
+        stop: () => SpeechRecognition.stop(),
+        abort: () => SpeechRecognition.stop(),
+      };
+      recognitionRef.current = session;
+      setIsListening(true);
+      setStatusText('वीर सुन रहा है… अब बोलिए');
+
+      try {
+        try {
+          soundFx.playActivate();
+        } catch (error) {
+          console.warn('[VEER] Sound effect unavailable:', error);
+        }
+
+        const permission = await SpeechRecognition.requestPermissions();
+        if (recognitionRef.current !== session) return;
+
+        if (permission.speechRecognition !== 'granted') {
+          setStatusText(
+            'माइक्रोफ़ोन की अनुमति नहीं मिली। Android App Info में VEER की Microphone अनुमति चालू करें।'
+          );
+          return;
+        }
+
+        const availability = await SpeechRecognition.available();
+        if (recognitionRef.current !== session) return;
+
+        if (!availability.available) {
+          setStatusText(
+            'इस फ़ोन में आवाज़ पहचान सेवा उपलब्ध नहीं है। Google ऐप और इंटरनेट जाँचें।'
+          );
+          return;
+        }
+
+        // popup:true returns final matches when the Android speech dialog finishes.
+        const result = await SpeechRecognition.start({
+          language: 'hi-IN',
+          maxResults: 1,
+          popup: true,
+          partialResults: false,
+        });
+
+        if (recognitionRef.current !== session) return;
+
+        const transcript = (result.matches?.[0] || '').trim();
+        if (transcript) {
+          void handleSendMessage(transcript);
+        } else {
+          setStatusText('आवाज़ समझ नहीं आई। माइक दबाकर फिर बोलें।');
+        }
+      } catch (error: any) {
+        console.warn('[VEER] Native speech recognition failed:', error);
+        if (recognitionRef.current === session) {
+          const message = String(error?.message || '').toLowerCase();
+          if (message.includes('permission') || message.includes('denied')) {
+            setStatusText(
+              'माइक्रोफ़ोन की अनुमति दें और फिर कोशिश करें।'
+            );
+          } else {
+            setStatusText(
+              'माइक शुरू नहीं हुआ। अनुमति, Google ऐप और इंटरनेट जाँचें।'
+            );
+          }
+        }
+      } finally {
+        if (recognitionRef.current === session) {
+          recognitionRef.current = null;
+          setIsListening(false);
+        }
+      }
+
+      return;
+    }
+
+    // Browser fallback: use the Web Speech API where available.
     const SpeechRecognitionCtor =
       (window as any).SpeechRecognition ||
       (window as any).webkitSpeechRecognition;
 
     if (!SpeechRecognitionCtor) {
       setStatusText(
-        'इस Android WebView में आवाज़ पहचान उपलब्ध नहीं है। ' +
-        'Chrome और Google ऐप अपडेट करके फिर कोशिश करें।'
+        'इस ब्राउज़र में आवाज़ पहचान उपलब्ध नहीं है। Chrome और Google ऐप अपडेट करके फिर कोशिश करें।'
       );
       return;
     }
@@ -667,7 +751,6 @@ export default function App() {
         if (recognitionRef.current === recognition) {
           recognitionRef.current = null;
         }
-
         setIsListening(false);
       };
 
@@ -678,9 +761,9 @@ export default function App() {
       setStatusText(
         'माइक शुरू नहीं हुआ। Android की माइक्रोफ़ोन अनुमति जाँचें।'
       );
-      console.warn('[VEER] Speech recognition failed:', error);
+      console.warn('[VEER] Browser speech recognition failed:', error);
     }
-  }, [isListening, isSpeaking, handleStopPlayback]);
+  }, [isListening, isSpeaking, handleStopPlayback, handleSendMessage]);
 
   useEffect(() => {
     return () => {
