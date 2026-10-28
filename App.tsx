@@ -1,3 +1,4 @@
+
 /**
  * @license
  * SPDX-License-Identifier: Apache-2.0
@@ -8,8 +9,8 @@ import { AndroidHeader } from './components/AndroidHeader';
 import { ChatArea } from './components/ChatArea';
 import { VoiceMicButton } from './components/VoiceMicButton';
 import { SettingsModal } from './components/SettingsModal';
-import { ChatMessage, VoiceSettings } from './types'
-import { speechManager } from './speechManager'
+import { ChatMessage, VoiceSettings } from './types';
+import { speechManager } from './speechManager';
 import { soundFx } from './soundEffects';
 import { detectVoiceCommand } from './voiceCommands';
 
@@ -22,7 +23,9 @@ export default function App() {
     try {
       const saved = localStorage.getItem(STORAGE_KEY_MESSAGES);
       if (saved) return JSON.parse(saved);
-    } catch (e) {}
+    } catch (error) {
+      console.warn('[VEER] Could not load saved messages:', error);
+    }
     return [];
   });
 
@@ -34,40 +37,46 @@ export default function App() {
       soundEffects: true,
       preferGeminiVoice: true,
     };
+
     try {
       const saved = localStorage.getItem(STORAGE_KEY_SETTINGS);
       if (saved) return { ...defaultSettings, ...JSON.parse(saved) };
-    } catch (e) {}
+    } catch (error) {
+      console.warn('[VEER] Could not load voice settings:', error);
+    }
+
     return defaultSettings;
   });
 
-  // Single authoritative state: Continuous Mode ON/OFF
-  const [continuousModeEnabled, setContinuousModeEnabled] = useState<boolean>(() => {
-    try {
-      const saved = localStorage.getItem(STORAGE_KEY_CONTINUOUS_MODE);
-      if (saved !== null) {
-        return saved === 'true';
+  const [continuousModeEnabled, setContinuousModeEnabled] =
+    useState<boolean>(() => {
+      try {
+        const saved = localStorage.getItem(STORAGE_KEY_CONTINUOUS_MODE);
+        if (saved !== null) return saved === 'true';
+      } catch (error) {
+        console.warn('[VEER] Could not load continuous mode:', error);
       }
-    } catch (e) {}
-    return true; // Enabled by default for natural back-and-forth conversation
-  });
+      return true;
+    });
 
-  const [isLoading, setIsLoading] = useState<boolean>(false);
-  const [isListening, setIsListening] = useState<boolean>(false);
-  const [isSpeaking, setIsSpeaking] = useState<boolean>(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [isListening, setIsListening] = useState(false);
+  const [isSpeaking, setIsSpeaking] = useState(false);
   const [activePlayingId, setActivePlayingId] = useState<string | null>(null);
-  const [statusText, setStatusText] = useState<string>('अब बोलिए');
-  const [isSettingsOpen, setIsSettingsOpen] = useState<boolean>(false);
+  const [statusText, setStatusText] = useState('अब बोलिए');
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [retryCountdown, setRetryCountdown] = useState<number | null>(null);
-  const [autoListenTrigger, setAutoListenTrigger] = useState<number>(0);
+  const [autoListenTrigger, setAutoListenTrigger] = useState(0);
 
   const retryIntervalRef = useRef<any>(null);
-  const autoRetryCountRef = useRef<number>(0);
+  const autoRetryCountRef = useRef(0);
   const autoListenTimerRef = useRef<any>(null);
   const voiceSettingsRef = useRef<VoiceSettings>(voiceSettings);
-  const continuousModeEnabledRef = useRef<boolean>(continuousModeEnabled);
+  const continuousModeEnabledRef = useRef(continuousModeEnabled);
+  const recognitionRef = useRef<any>(null);
+  const wakeLockSentinelRef = useRef<any>(null);
+  const loadingRef = useRef(false);
 
-  // Keep refs strictly in sync
   useEffect(() => {
     voiceSettingsRef.current = voiceSettings;
   }, [voiceSettings]);
@@ -75,71 +84,90 @@ export default function App() {
   useEffect(() => {
     continuousModeEnabledRef.current = continuousModeEnabled;
     try {
-      localStorage.setItem(STORAGE_KEY_CONTINUOUS_MODE, String(continuousModeEnabled));
-    } catch (e) {}
+      localStorage.setItem(
+        STORAGE_KEY_CONTINUOUS_MODE,
+        String(continuousModeEnabled)
+      );
+    } catch (error) {
+      console.warn('[VEER] Could not save continuous mode:', error);
+    }
   }, [continuousModeEnabled]);
 
-  // Sync soundFx config
   useEffect(() => {
     soundFx.enabled = voiceSettings.soundEffects;
   }, [voiceSettings.soundEffects]);
 
-  // Persist messages
   useEffect(() => {
     try {
       localStorage.setItem(STORAGE_KEY_MESSAGES, JSON.stringify(messages));
-    } catch (e) {}
+    } catch (error) {
+      console.warn('[VEER] Could not save messages:', error);
+    }
   }, [messages]);
 
-  // Persist settings
   useEffect(() => {
     try {
-      localStorage.setItem(STORAGE_KEY_SETTINGS, JSON.stringify(voiceSettings));
-    } catch (e) {}
+      localStorage.setItem(
+        STORAGE_KEY_SETTINGS,
+        JSON.stringify(voiceSettings)
+      );
+    } catch (error) {
+      console.warn('[VEER] Could not save settings:', error);
+    }
   }, [voiceSettings]);
 
-  // Screen WakeLock ref (Keeps phone screen on while continuous listening is active)
-  const wakeLockSentinelRef = useRef<any>(null);
-
   const requestWakeLock = useCallback(async () => {
-    if (typeof navigator !== 'undefined' && 'wakeLock' in navigator) {
-      try {
-        if (!wakeLockSentinelRef.current && document.visibilityState === 'visible') {
-          wakeLockSentinelRef.current = await (navigator as any).wakeLock.request('screen');
-          wakeLockSentinelRef.current.addEventListener('release', () => {
+    if (
+      typeof navigator === 'undefined' ||
+      !('wakeLock' in navigator) ||
+      document.visibilityState !== 'visible'
+    ) {
+      return;
+    }
+
+    try {
+      if (!wakeLockSentinelRef.current) {
+        const sentinel = await (navigator as any).wakeLock.request('screen');
+        wakeLockSentinelRef.current = sentinel;
+
+        sentinel.addEventListener('release', () => {
+          if (wakeLockSentinelRef.current === sentinel) {
             wakeLockSentinelRef.current = null;
-          });
-        }
-      } catch (err) {
-        // WakeLock may fail if device is in aggressive battery saver or page is hidden
+          }
+        });
       }
+    } catch (error) {
+      // Wake Lock is optional and may be unavailable on some devices.
+      console.warn('[VEER] Wake Lock unavailable:', error);
     }
   }, []);
 
   const releaseWakeLock = useCallback(() => {
-    if (wakeLockSentinelRef.current) {
+    const sentinel = wakeLockSentinelRef.current;
+    wakeLockSentinelRef.current = null;
+
+    if (sentinel) {
       try {
-        wakeLockSentinelRef.current.release();
-      } catch (e) {}
-      wakeLockSentinelRef.current = null;
+        void sentinel.release();
+      } catch (error) {
+        console.warn('[VEER] Could not release Wake Lock:', error);
+      }
     }
   }, []);
 
-  // Sync Screen WakeLock with continuousModeEnabled
   useEffect(() => {
     if (continuousModeEnabled) {
-      requestWakeLock();
+      void requestWakeLock();
     } else {
       releaseWakeLock();
     }
   }, [continuousModeEnabled, requestWakeLock, releaseWakeLock]);
 
-  // Handle visibility changes safely (screen lock / unlock / tab switch)
   useEffect(() => {
     const handleVisibilityChange = () => {
       if (document.visibilityState === 'visible') {
         if (continuousModeEnabledRef.current) {
-          requestWakeLock();
+          void requestWakeLock();
         }
       } else {
         releaseWakeLock();
@@ -147,42 +175,39 @@ export default function App() {
     };
 
     document.addEventListener('visibilitychange', handleVisibilityChange);
+
     return () => {
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      document.removeEventListener(
+        'visibilitychange',
+        handleVisibilityChange
+      );
       releaseWakeLock();
     };
   }, [requestWakeLock, releaseWakeLock]);
 
-  // Cancel any pending auto-listen restart timer immediately
   const cancelAutoListen = useCallback(() => {
-    if (autoListenTimerRef.current) {
+    if (autoListenTimerRef.current !== null) {
       clearTimeout(autoListenTimerRef.current);
       autoListenTimerRef.current = null;
     }
   }, []);
 
-  // Schedule auto-listen ONLY if continuous mode is authoritatively enabled
   const scheduleAutoListen = useCallback(() => {
     cancelAutoListen();
-    if (!continuousModeEnabledRef.current) return;
 
-    // 450ms safety buffer to ensure audio playback is completely silent before opening mic
+    if (!continuousModeEnabledRef.current || loadingRef.current) return;
+
     autoListenTimerRef.current = setTimeout(() => {
       autoListenTimerRef.current = null;
-      if (continuousModeEnabledRef.current) {
-        setAutoListenTrigger((prev) => prev + 1);
-      }
-    }, 450);
-  }, [cancelAutoListen]);
 
-  // Clean up timers on unmount
-  useEffect(() => {
-    return () => {
-      cancelAutoListen();
-      if (retryIntervalRef.current) {
-        clearInterval(retryIntervalRef.current);
+      if (
+        continuousModeEnabledRef.current &&
+        !loadingRef.current &&
+        document.visibilityState === 'visible'
+      ) {
+        setAutoListenTrigger((previous) => previous + 1);
       }
-    };
+    }, 700);
   }, [cancelAutoListen]);
 
   const updateStatus = useCallback((text: string) => {
@@ -191,47 +216,101 @@ export default function App() {
 
   const handleStopPlayback = useCallback(() => {
     cancelAutoListen();
-    speechManager.stop();
+
+    try {
+      speechManager.stop();
+    } catch (error) {
+      console.warn('[VEER] Could not stop speech:', error);
+    }
+
     setIsSpeaking(false);
     setActivePlayingId(null);
-    if (continuousModeEnabledRef.current) {
-      setStatusText('अब बोलिए');
-    } else {
-      setStatusText('लगातार सुनना बंद है (माइक दबाकर बोलें)');
-    }
+
+    setStatusText(
+      continuousModeEnabledRef.current
+        ? 'अब बोलिए'
+        : 'लगातार सुनना बंद है (माइक दबाकर बोलें)'
+    );
   }, [cancelAutoListen]);
 
-  // Reliable ON/OFF toggle: turns OFF immediately and stays OFF until turned ON again
   const handleToggleContinuousMode = useCallback(
     (forcedValue?: boolean) => {
-      setContinuousModeEnabled((prev) => {
-        const next = typeof forcedValue === 'boolean' ? forcedValue : !prev;
-        continuousModeEnabledRef.current = next;
-        try {
-          localStorage.setItem(STORAGE_KEY_CONTINUOUS_MODE, String(next));
-        } catch (e) {}
+      const next =
+        typeof forcedValue === 'boolean'
+          ? forcedValue
+          : !continuousModeEnabledRef.current;
 
-        if (!next) {
-          // Turning OFF: immediately cancel restart timers, stop speech, and clear speaking/playing state!
-          cancelAutoListen();
-          speechManager.stop();
-          setIsSpeaking(false);
-          setActivePlayingId(null);
-          soundFx.playPowerDown();
-          setStatusText('लगातार सुनना बंद है (माइक दबाकर बोलें)');
-        } else {
-          // Turning ON: play chime, start listening if idle
-          soundFx.playPowerUp();
-          setStatusText('लगातार सुनना चालू • अब बोलिए');
-          if (!isLoading && !isSpeaking) {
-            scheduleAutoListen();
-          }
+      continuousModeEnabledRef.current = next;
+      setContinuousModeEnabled(next);
+
+      try {
+        localStorage.setItem(STORAGE_KEY_CONTINUOUS_MODE, String(next));
+      } catch (error) {
+        console.warn('[VEER] Could not save continuous mode:', error);
+      }
+
+      if (!next) {
+        cancelAutoListen();
+
+        try {
+          recognitionRef.current?.stop?.();
+        } catch (error) {
+          console.warn('[VEER] Could not stop microphone:', error);
         }
-        return next;
-      });
+
+        recognitionRef.current = null;
+        setIsListening(false);
+
+        try {
+          speechManager.stop();
+        } catch (error) {
+          console.warn('[VEER] Could not stop speech:', error);
+        }
+
+        setIsSpeaking(false);
+        setActivePlayingId(null);
+
+        try {
+          soundFx.playPowerDown();
+        } catch (error) {
+          console.warn('[VEER] Sound effect unavailable:', error);
+        }
+
+        setStatusText('लगातार सुनना बंद है (माइक दबाकर बोलें)');
+      } else {
+        try {
+          soundFx.playPowerUp();
+        } catch (error) {
+          console.warn('[VEER] Sound effect unavailable:', error);
+        }
+
+        setStatusText('लगातार सुनना चालू • अब बोलिए');
+
+        if (!loadingRef.current) {
+          scheduleAutoListen();
+        }
+      }
     },
-    [cancelAutoListen, isLoading, isSpeaking, scheduleAutoListen]
+    [cancelAutoListen, scheduleAutoListen]
   );
+
+  const handleCancelCountdown = useCallback(() => {
+    cancelAutoListen();
+
+    if (retryIntervalRef.current !== null) {
+      clearInterval(retryIntervalRef.current);
+      retryIntervalRef.current = null;
+    }
+
+    setRetryCountdown(null);
+    autoRetryCountRef.current = 0;
+
+    setStatusText(
+      continuousModeEnabledRef.current
+        ? 'अब बोलिए'
+        : 'लगातार सुनना बंद है (माइक दबाकर बोलें)'
+    );
+  }, [cancelAutoListen]);
 
   const handlePlayMessage = useCallback(
     (msg: ChatMessage) => {
@@ -240,63 +319,61 @@ export default function App() {
       setIsSpeaking(true);
       setStatusText('वीर बोल रहा है');
 
-      speechManager.speak(
-        msg.text,
-        voiceSettingsRef.current,
-        () => {
-          setIsSpeaking(true);
-          setActivePlayingId(msg.id);
-          setStatusText('वीर बोल रहा है');
-        },
-        () => {
-          setIsSpeaking(false);
-          setActivePlayingId(null);
-          if (continuousModeEnabledRef.current) {
-            setStatusText('वीर सुन रहा है... अब बोलिए');
-            scheduleAutoListen();
-          } else {
-            setStatusText('लगातार सुनना बंद है (माइक दबाकर बोलें)');
+      try {
+        speechManager.speak(
+          msg.text,
+          voiceSettingsRef.current,
+          () => {
+            setIsSpeaking(true);
+            setActivePlayingId(msg.id);
+            setStatusText('वीर बोल रहा है');
+          },
+          () => {
+            setIsSpeaking(false);
+            setActivePlayingId(null);
+
+            if (continuousModeEnabledRef.current) {
+              setStatusText('वीर सुन रहा है… अब बोलिए');
+              scheduleAutoListen();
+            } else {
+              setStatusText('लगातार सुनना बंद है (माइक दबाकर बोलें)');
+            }
+          },
+          () => {
+            setIsSpeaking(false);
+            setActivePlayingId(null);
+
+            if (continuousModeEnabledRef.current) {
+              setStatusText('अब बोलिए');
+              scheduleAutoListen();
+            } else {
+              setStatusText('लगातार सुनना बंद है (माइक दबाकर बोलें)');
+            }
           }
-        },
-        () => {
-          setIsSpeaking(false);
-          setActivePlayingId(null);
-          if (continuousModeEnabledRef.current) {
-            setStatusText('अब बोलिए');
-            scheduleAutoListen();
-          } else {
-            setStatusText('लगातार सुनना बंद है (माइक दबाकर बोलें)');
-          }
-        }
-      );
+        );
+      } catch (error) {
+        console.warn('[VEER] Speech playback failed:', error);
+        setIsSpeaking(false);
+        setActivePlayingId(null);
+        setStatusText('आवाज़ चलाने में समस्या आई।');
+      }
     },
     [handleStopPlayback, scheduleAutoListen]
   );
 
-  const handleCancelCountdown = useCallback(() => {
-    cancelAutoListen();
-    if (retryIntervalRef.current) {
-      clearInterval(retryIntervalRef.current);
-      retryIntervalRef.current = null;
-    }
-    setRetryCountdown(null);
-    autoRetryCountRef.current = 0;
-    setStatusText(
-      continuousModeEnabledRef.current
-        ? 'अब बोलिए'
-        : 'लगातार सुनना बंद है (माइक दबाकर बोलें)'
-    );
-  }, [cancelAutoListen]);
-
   const handleSendMessage = async (text: string) => {
-    if (!text.trim() || isLoading) return;
+    const cleanText = text.trim();
 
-    // Stop ongoing speech & cancel any active countdown
+    if (!cleanText || loadingRef.current) return;
+
+    cancelAutoListen();
     handleStopPlayback();
-    if (retryIntervalRef.current) {
+
+    if (retryIntervalRef.current !== null) {
       clearInterval(retryIntervalRef.current);
       retryIntervalRef.current = null;
     }
+
     setRetryCountdown(null);
 
     const timestamp = new Date().toLocaleTimeString('hi-IN', {
@@ -308,14 +385,13 @@ export default function App() {
     const userMessage: ChatMessage = {
       id: `user-${Date.now()}`,
       sender: 'user',
-      text: text.trim(),
+      text: cleanText,
       timestamp,
     };
 
-    setMessages((prev) => [...prev, userMessage]);
+    setMessages((previous) => [...previous, userMessage]);
 
-    // Check for hands-free voice commands ("वीर, आराम करो" / "वीर, फिर सुनो")
-    const voiceCmd = detectVoiceCommand(text);
+    const voiceCmd = detectVoiceCommand(cleanText);
 
     if (voiceCmd === 'pause') {
       handleToggleContinuousMode(false);
@@ -323,7 +399,9 @@ export default function App() {
       const pauseMessage: ChatMessage = {
         id: `veer-pause-${Date.now()}`,
         sender: 'veer',
-        text: 'ठीक है साथी, लगातार सुनना बंद कर दिया गया है। जब भी बात करनी हो, नारंगी माइक दबाएं या "लगातार सुनना" बटन चालू करें।',
+        text:
+          'ठीक है साथी, लगातार सुनना बंद कर दिया गया है। ' +
+          'बात करने के लिए माइक दबाएँ या लगातार सुनना चालू करें।',
         timestamp: new Date().toLocaleTimeString('hi-IN', {
           hour: '2-digit',
           minute: '2-digit',
@@ -331,13 +409,14 @@ export default function App() {
         }),
       };
 
-      setMessages((prev) => [...prev, pauseMessage]);
+      setMessages((previous) => [...previous, pauseMessage]);
 
       if (voiceSettingsRef.current.autoSpeak) {
         handlePlayMessage(pauseMessage);
       } else {
         setStatusText('लगातार सुनना बंद है (माइक दबाकर बोलें)');
       }
+
       return;
     }
 
@@ -347,7 +426,9 @@ export default function App() {
       const resumeMessage: ChatMessage = {
         id: `veer-resume-${Date.now()}`,
         sender: 'veer',
-        text: 'लगातार सुनना चालू हो गया है साथी! अब आप बिना बटन दबाए लगातार बातचीत कर सकते हैं। बताइए, मैं आपकी क्या सहायता करूँ?',
+        text:
+          'लगातार सुनना चालू हो गया है साथी! ' +
+          'बताइए, मैं आपकी क्या सहायता करूँ?',
         timestamp: new Date().toLocaleTimeString('hi-IN', {
           hour: '2-digit',
           minute: '2-digit',
@@ -355,7 +436,7 @@ export default function App() {
         }),
       };
 
-      setMessages((prev) => [...prev, resumeMessage]);
+      setMessages((previous) => [...previous, resumeMessage]);
 
       if (voiceSettingsRef.current.autoSpeak) {
         handlePlayMessage(resumeMessage);
@@ -363,71 +444,67 @@ export default function App() {
         setStatusText('लगातार सुनना चालू • अब बोलिए');
         scheduleAutoListen();
       }
+
       return;
     }
 
+    loadingRef.current = true;
     setIsLoading(true);
     setStatusText('वीर जवाब दे रहा है');
 
-    // 13-second safety timeout so app and mic never get stuck waiting forever
     const abortController = new AbortController();
     const abortTimer = setTimeout(() => abortController.abort(), 13000);
 
     try {
-      // Build history for context
-      const history = messages.slice(-6).map((m) => ({
-        role: m.sender === 'user' ? 'user' : 'model',
-        text: m.text,
+      const history = messages.slice(-6).map((message) => ({
+        role: message.sender === 'user' ? 'user' : 'model',
+        text: message.text,
       }));
 
-      const res = await fetch('/api/chat', {
+      const response = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: text.trim(), history }),
+        body: JSON.stringify({ message: cleanText, history }),
         signal: abortController.signal,
       });
 
-      clearTimeout(abortTimer);
-
-      if (!res.ok) {
-        throw new Error(`HTTP ${res.status}`);
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`);
       }
 
-      const data = await res.json();
+      const data = await response.json();
 
-      // If AI Server returned 503 indicator or failure
       if (data.is503) {
-        const veer503Message: ChatMessage = {
+        const errorMessage: ChatMessage = {
           id: `veer-503-${Date.now()}`,
           sender: 'veer',
-          text: data.reply || 'क्षमा करें साथी, Google AI सर्वर पर अत्यधिक लोड (503 Server Busy) है। कृपया नीचे "दोबारा प्रयास करें" दबाएं।',
+          text:
+            data.reply ||
+            'क्षमा करें साथी, AI सर्वर अभी व्यस्त है। कृपया दोबारा प्रयास करें।',
           timestamp: new Date().toLocaleTimeString('hi-IN', {
             hour: '2-digit',
             minute: '2-digit',
             hour12: true,
           }),
           is503Error: true,
-          retryQuery: text.trim(),
+          retryQuery: cleanText,
         };
 
-        setMessages((prev) => [...prev, veer503Message]);
-        soundFx.playPowerDown();
+        setMessages((previous) => [...previous, errorMessage]);
 
-        // REQUIREMENT: When an AI request fails, clear loading/speaking state and re-enable controls
-        handleStopPlayback();
-        setIsLoading(false);
-        setIsSpeaking(false);
-        setStatusText(
-          continuousModeEnabledRef.current
-            ? 'अब बोलिए (या पुनः प्रयास करें)'
-            : 'लगातार सुनना बंद है (माइक दबाकर बोलें)'
-        );
+        try {
+          soundFx.playPowerDown();
+        } catch (error) {
+          console.warn('[VEER] Sound effect unavailable:', error);
+        }
+
+        setStatusText('AI सर्वर व्यस्त है। थोड़ी देर बाद फिर प्रयास करें।');
         return;
       }
 
       const replyText =
         data.reply ||
-        'नमस्ते साथी! वीर आपकी सेवा में सदैव तत्पर है। कृपया दोबारा पूछें।';
+        'नमस्ते साथी! वीर आपकी सेवा में तत्पर है। कृपया दोबारा पूछें।';
 
       const veerMessage: ChatMessage = {
         id: `veer-${Date.now()}`,
@@ -441,31 +518,35 @@ export default function App() {
         modelUsed: data.model || data.source,
       };
 
-      setMessages((prev) => [...prev, veerMessage]);
-      soundFx.playHeroResponse();
+      setMessages((previous) => [...previous, veerMessage]);
 
-      // Automatically speak aloud if autoSpeak enabled
+      try {
+        soundFx.playHeroResponse();
+      } catch (error) {
+        console.warn('[VEER] Sound effect unavailable:', error);
+      }
+
       if (voiceSettingsRef.current.autoSpeak) {
         handlePlayMessage(veerMessage);
+      } else if (continuousModeEnabledRef.current) {
+        setStatusText('अब बोलिए');
+        scheduleAutoListen();
       } else {
-        if (continuousModeEnabledRef.current) {
-          setStatusText('अब बोलिए');
-          scheduleAutoListen();
-        } else {
-          setStatusText('लगातार सुनना बंद है (माइक दबाकर बोलें)');
-        }
+        setStatusText('लगातार सुनना बंद है (माइक दबाकर बोलें)');
       }
     } catch (error: any) {
-      clearTimeout(abortTimer);
-      console.warn('[VEER] Request error / timeout / 503:', error);
+      console.warn('[VEER] Request error:', error);
 
       const isTimeout = error?.name === 'AbortError';
-      const is503 = error?.message?.includes('503') || error?.message?.includes('high demand');
+      const is503 =
+        error?.message?.includes('503') ||
+        error?.message?.includes('high demand');
+
       const errorText = is503
-        ? 'क्षमा करें साथी, Google AI सर्वर व्यस्त (503 Server Busy) है। माइक्रोफ़ोन सुरक्षित है — आप नीचे "दोबारा प्रयास करें" दबा सकते हैं।'
+        ? 'AI सर्वर अभी व्यस्त है। कृपया दोबारा प्रयास करें।'
         : isTimeout
-        ? 'क्षमा करें साथी, AI सर्वर से जवाब मिलने में समय लग रहा है। माइक्रोफ़ोन सुरक्षित है — आप नीचे "दोबारा प्रयास करें" दबा सकते हैं।'
-        : 'क्षमा करें साथी, नेटवर्क या AI सर्वर से जुड़ने में समस्या आई है। माइक्रोफ़ोन सुरक्षित है — आप नीचे "दोबारा प्रयास करें" दबा सकते हैं।';
+          ? 'जवाब आने में समय लग रहा है। इंटरनेट जाँचकर फिर प्रयास करें।'
+          : 'नेटवर्क या AI सर्वर से जुड़ने में समस्या आई है। इंटरनेट जाँचें।';
 
       const errorMessage: ChatMessage = {
         id: `veer-err-${Date.now()}`,
@@ -478,33 +559,167 @@ export default function App() {
         }),
         isError: true,
         is503Error: true,
-        retryQuery: text.trim(),
+        retryQuery: cleanText,
       };
 
-      setMessages((prev) => [...prev, errorMessage]);
-      soundFx.playPowerDown();
+      setMessages((previous) => [...previous, errorMessage]);
 
-      // REQUIREMENT: When an AI request fails, clear loading/speaking state and re-enable controls immediately!
-      handleStopPlayback();
-      setIsLoading(false);
+      try {
+        soundFx.playPowerDown();
+      } catch (soundError) {
+        console.warn('[VEER] Sound effect unavailable:', soundError);
+      }
+
       setIsSpeaking(false);
+      setActivePlayingId(null);
+
       setStatusText(
         continuousModeEnabledRef.current
           ? 'अब बोलिए (या पुनः प्रयास करें)'
           : 'लगातार सुनना बंद है (माइक दबाकर बोलें)'
       );
     } finally {
+      clearTimeout(abortTimer);
+      loadingRef.current = false;
       setIsLoading(false);
     }
   };
+
+  const handleMicClick = useCallback(() => {
+    if (loadingRef.current) return;
+
+    if (isSpeaking) {
+      handleStopPlayback();
+      return;
+    }
+
+    if (isListening) {
+      try {
+        recognitionRef.current?.stop?.();
+      } catch (error) {
+        console.warn('[VEER] Could not stop microphone:', error);
+      }
+
+      recognitionRef.current = null;
+      setIsListening(false);
+      setStatusText('माइक बंद कर दिया गया');
+      return;
+    }
+
+    const SpeechRecognitionCtor =
+      (window as any).SpeechRecognition ||
+      (window as any).webkitSpeechRecognition;
+
+    if (!SpeechRecognitionCtor) {
+      setStatusText(
+        'इस Android WebView में आवाज़ पहचान उपलब्ध नहीं है। ' +
+        'Chrome और Google ऐप अपडेट करके फिर कोशिश करें।'
+      );
+      return;
+    }
+
+    try {
+      const recognition = new SpeechRecognitionCtor();
+      recognitionRef.current = recognition;
+
+      recognition.lang = 'hi-IN';
+      recognition.continuous = false;
+      recognition.interimResults = false;
+      recognition.maxAlternatives = 1;
+
+      recognition.onstart = () => {
+        setIsListening(true);
+        setStatusText('वीर सुन रहा है… अब बोलिए');
+
+        try {
+          soundFx.playActivate();
+        } catch (error) {
+          console.warn('[VEER] Sound effect unavailable:', error);
+        }
+      };
+
+      recognition.onresult = (event: any) => {
+        const transcript = Array.from(event.results || [])
+          .map((result: any) => result?.[0]?.transcript || '')
+          .join(' ')
+          .trim();
+
+        if (transcript) {
+          void handleSendMessage(transcript);
+        } else {
+          setStatusText('आवाज़ समझ नहीं आई। माइक दबाकर फिर बोलें।');
+        }
+      };
+
+      recognition.onerror = (event: any) => {
+        const error = event?.error;
+
+        if (error === 'not-allowed' || error === 'service-not-allowed') {
+          setStatusText('माइक्रोफ़ोन की अनुमति दें और फिर कोशिश करें।');
+        } else if (error === 'no-speech') {
+          setStatusText('आवाज़ नहीं मिली। माइक दबाकर फिर बोलें।');
+        } else {
+          setStatusText('माइक में समस्या आई। अनुमति और इंटरनेट जाँचें।');
+        }
+      };
+
+      recognition.onend = () => {
+        if (recognitionRef.current === recognition) {
+          recognitionRef.current = null;
+        }
+
+        setIsListening(false);
+      };
+
+      recognition.start();
+    } catch (error) {
+      recognitionRef.current = null;
+      setIsListening(false);
+      setStatusText(
+        'माइक शुरू नहीं हुआ। Android की माइक्रोफ़ोन अनुमति जाँचें।'
+      );
+      console.warn('[VEER] Speech recognition failed:', error);
+    }
+  }, [isListening, isSpeaking, handleStopPlayback]);
+
+  useEffect(() => {
+    return () => {
+      cancelAutoListen();
+
+      if (retryIntervalRef.current !== null) {
+        clearInterval(retryIntervalRef.current);
+      }
+
+      try {
+        recognitionRef.current?.abort?.();
+      } catch (error) {
+        console.warn('[VEER] Could not close microphone:', error);
+      }
+
+      recognitionRef.current = null;
+      releaseWakeLock();
+    };
+  }, [cancelAutoListen, releaseWakeLock]);
 
   const handleClearChat = () => {
     cancelAutoListen();
     handleStopPlayback();
     handleCancelCountdown();
+
     setMessages([]);
-    localStorage.removeItem(STORAGE_KEY_MESSAGES);
-    soundFx.playPowerDown();
+
+    try {
+      localStorage.removeItem(STORAGE_KEY_MESSAGES);
+    } catch (error) {
+      console.warn('[VEER] Could not clear saved messages:', error);
+    }
+
+    try {
+      soundFx.playPowerDown();
+    } catch (error) {
+      console.warn('[VEER] Sound effect unavailable:', error);
+    }
+
     setStatusText(
       continuousModeEnabledRef.current
         ? 'अब बोलिए'
@@ -514,19 +729,19 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-[#070a12] flex items-center justify-center p-0 sm:p-4 text-slate-100 overflow-hidden">
-      {/* Android Device Mockup Shell on Desktop / Direct Fullscreen on Mobile */}
       <div className="w-full max-w-md h-screen sm:h-[880px] sm:max-h-[96vh] bg-slate-950 sm:rounded-[40px] sm:border-[5px] sm:border-slate-800/90 shadow-2xl flex flex-col relative overflow-hidden ring-1 ring-white/10 sm:shadow-amber-500/10">
-        {/* Subtle superhero background gradient */}
         <div className="absolute inset-0 bg-radial from-amber-500/5 via-transparent to-transparent pointer-events-none" />
 
-        {/* Android Top Header */}
         <AndroidHeader
           statusText={statusText}
           isSpeaking={isSpeaking}
           isListening={isListening}
           voiceSettings={voiceSettings}
           onToggleAutoSpeak={() =>
-            setVoiceSettings((s) => ({ ...s, autoSpeak: !s.autoSpeak }))
+            setVoiceSettings((settings) => ({
+              ...settings,
+              autoSpeak: !settings.autoSpeak,
+            }))
           }
           onOpenSettings={() => setIsSettingsOpen(true)}
           onClearChat={handleClearChat}
@@ -534,7 +749,6 @@ export default function App() {
           onToggleContinuousMode={handleToggleContinuousMode}
         />
 
-        {/* Central Chat Area */}
         <ChatArea
           messages={messages}
           isLoading={isLoading}
@@ -542,18 +756,19 @@ export default function App() {
           retryCountdown={retryCountdown}
           onPlayMessage={handlePlayMessage}
           onStopPlayback={handleStopPlayback}
-          onSelectSuggestion={(suggestionText) => handleSendMessage(suggestionText)}
-          onRetryMessage={(query) => handleSendMessage(query)}
+          onSelectSuggestion={(suggestionText) =>
+            void handleSendMessage(suggestionText)
+          }
+          onRetryMessage={(query) => void handleSendMessage(query)}
           onCancelCountdown={handleCancelCountdown}
         />
 
-        {/* Floating Voice Mic & Bottom Dock */}
         <VoiceMicButton
+          onClick={handleMicClick}
           onSendMessage={handleSendMessage}
           isLoading={isLoading}
           isSpeaking={isSpeaking}
           isListening={isListening}
-          setIsListening={setIsListening}
           onListeningStateChange={updateStatus}
           onStopPlayback={handleStopPlayback}
           autoListenTrigger={autoListenTrigger}
@@ -561,18 +776,19 @@ export default function App() {
           onToggleContinuousMode={handleToggleContinuousMode}
         />
 
-        {/* Android Gesture Bar */}
         <div className="w-full pb-1 pt-0.5 flex justify-center bg-slate-950 pointer-events-none">
           <div className="w-32 h-1 bg-slate-700/80 rounded-full" />
         </div>
 
-        {/* Settings Modal */}
         <SettingsModal
           isOpen={isSettingsOpen}
           onClose={() => setIsSettingsOpen(false)}
           voiceSettings={voiceSettings}
           onUpdateSettings={(newSettings) =>
-            setVoiceSettings((prev) => ({ ...prev, ...newSettings }))
+            setVoiceSettings((previous) => ({
+              ...previous,
+              ...newSettings,
+            }))
           }
           onClearChat={handleClearChat}
           continuousModeEnabled={continuousModeEnabled}
