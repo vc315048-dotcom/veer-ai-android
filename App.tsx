@@ -19,6 +19,7 @@ import { detectVoiceCommand } from './voiceCommands';
 const STORAGE_KEY_MESSAGES = 'veer_messages_v1';
 const STORAGE_KEY_SETTINGS = 'veer_settings_v1';
 const STORAGE_KEY_CONTINUOUS_MODE = 'veer_continuous_mode_v3';
+const API_BASE_URL = 'https://ais-dev-d6vx7fbb2gwwxyvoxvgwhp-982249227133.asia-east1.run.app';
 
 export default function App() {
   const [messages, setMessages] = useState<ChatMessage[]>(() => {
@@ -463,7 +464,7 @@ export default function App() {
         text: message.text,
       }));
 
-      const response = await fetch('/api/chat', {
+      const response = await fetch(`${API_BASE_URL}/api/chat`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ message: cleanText, history }),
