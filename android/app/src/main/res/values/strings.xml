@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">VEER</string>
+    <string name="title_activity_main">VEER</string>
+    <string name="package_name">com.veer.ai</string>
+    <string name="custom_url_scheme">com.veer.ai</string>
+</resources>
