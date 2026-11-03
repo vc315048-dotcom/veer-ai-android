@@ -217,14 +217,16 @@ export default function App() {
     setStatusText(text);
   }, []);
 
-  const handleStopPlayback = useCallback(() => {
+  // Stop audio playback. While sending a user message or starting TTS,
+  // callers pass false so the native microphone cannot restart too early.
+  const handleStopPlayback = useCallback((resumeNativeListening = true) => {
     cancelAutoListen();
     speechManager.stop();
     setIsSpeaking(false);
     setActivePlayingId(null);
     if (continuousModeEnabledRef.current) {
       setStatusText('अब बोलिए');
-      if (isNativeAndroid()) {
+      if (resumeNativeListening && isNativeAndroid()) {
         nativeVoiceService.resumeListening();
       }
     } else {
@@ -293,7 +295,7 @@ export default function App() {
     (msg: ChatMessage) => {
       speechManager.unlockAudio();
       setTtsError(null);
-      handleStopPlayback();
+      handleStopPlayback(false);
       setActivePlayingId(msg.id);
       setStatusText('ऑडियो तैयार हो रहा है...');
       if (isNativeAndroid()) {
@@ -371,8 +373,10 @@ export default function App() {
       nativeVoiceService.pauseListening();
     }
 
-    // Stop ongoing speech & cancel any active countdown
-    handleStopPlayback();
+    // Keep the native microphone paused for the entire Gemini request.
+    // Do not let handleStopPlayback() resume it before the AI reply is ready.
+    // Stop ongoing speech & cancel any active countdown.
+    handleStopPlayback(false);
     if (retryIntervalRef.current) {
       clearInterval(retryIntervalRef.current);
       retryIntervalRef.current = null;
