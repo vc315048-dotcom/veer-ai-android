@@ -1,0 +1,10 @@
+{
+  "name": "VEER - Personal AI Superhero Assistant",
+  "description": "एक सरल और शक्तिशाली Android-फ्रेंडली व्यक्तिगत AI सहायक जो आपकी हिन्दी आवाज़ सुनकर समझदारी से जवाब देता है और बोलकर बताता है।",
+  "requestFramePermissions": [
+    "MICROPHONE"
+  ],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
