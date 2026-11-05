@@ -7,7 +7,7 @@ import { Capacitor } from '@capacitor/core';
  * Never put a Gemini API key in this client-side file.
  */
 const KNOWN_ANDROID_API_ORIGIN =
-  'https://ais-dev-d6vx7fbb2gwwxyvoxvgwhp-982249227133.asia-east1.run.app';
+  https://veer-personal-ai-superhero-assistant.ai.studio
 
 const configuredOrigin = (import.meta.env.VITE_API_BASE_URL || '').trim();
 const isNativeAndroid =
