@@ -5,4 +5,8 @@
         <item name="android:colorAccent">#00C853</item>
         <item name="android:windowLightStatusBar">true</item>
     </style>
+
+    <style name="AppTheme.NoActionBarLaunch" parent="AppTheme">
+        <item name="android:windowBackground">@android:color/white</item>
+    </style>
 </resources>
