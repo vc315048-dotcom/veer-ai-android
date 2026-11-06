@@ -6,6 +6,7 @@ on:
   push:
     branches:
       - main
+      - veer-fixed-source
 
 jobs:
   build:
@@ -26,6 +27,12 @@ jobs:
           distribution: temurin
           java-version: 21
 
+      - name: Restore release keystore
+        env:
+          VEER_RELEASE_KEY_BASE64: ${{ secrets.VEER_RELEASE_KEY_BASE64 }}
+        run: |
+          echo "$VEER_RELEASE_KEY_BASE64" | base64 --decode > android/app/veer-release-key.jks
+
       - name: Install dependencies
         run: npm install --legacy-peer-deps
 
@@ -35,14 +42,19 @@ jobs:
       - name: Sync Android project
         run: npx cap sync android
 
-      - name: Build APK
+      - name: Build Release APK
+        env:
+          VEER_KEYSTORE_PASSWORD: ${{ secrets.VEER_KEYSTORE_PASSWORD }}
+          VEER_KEY_ALIAS: ${{ secrets.VEER_KEY_ALIAS }}
+          VEER_KEY_PASSWORD: ${{ secrets.VEER_KEY_PASSWORD }}
         run: |
           cd android
           chmod +x gradlew
-          ./gradlew assembleDebug
+          ./gradlew assembleRelease
 
-      - name: Upload APK
+      - name: Upload Release APK
         uses: actions/upload-artifact@v4
         with:
-          name: VEER-Android-APK
-          path: android/app/build/outputs/apk/debug/app-debug.apk
+          name: VEER-Android-Release
+          path: android/app/build/outputs/apk/release/app-release.apk
+          
