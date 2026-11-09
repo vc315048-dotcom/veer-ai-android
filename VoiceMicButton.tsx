@@ -145,8 +145,13 @@ export const VoiceMicButton: React.FC<VoiceMicButtonProps> = ({
         return;
       }
 
-      // In native Android, background continuous voice is handled by VeerVoiceForegroundService
-      if (!isManualClick && isNativeAndroid()) {
+      // In native Android, continuous voice is handled by VeerVoiceForegroundService.
+      // Never launch a second browser recognizer (even from a manual mic tap) while
+      // that native listener is active; both engines compete for the microphone.
+      if (isNativeAndroid() && continuousModeRef.current) {
+        setSpeechError(null);
+        setIsListening(false);
+        onListeningStateChange?.('वीर का native माइक्रोफोन सुन रहा है');
         return;
       }
 

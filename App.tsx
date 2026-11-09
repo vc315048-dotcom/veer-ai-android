@@ -371,8 +371,13 @@ export default function App() {
       nativeVoiceService.pauseListening();
     }
 
-    // Stop ongoing speech & cancel any active countdown
-    handleStopPlayback();
+    // Stop any previous reply without resuming the native microphone.
+    // This callback may come from Android's native SpeechRecognizer; reopening
+    // the mic here would compete with the AI request and reply audio.
+    cancelAutoListen();
+    speechManager.stop();
+    setIsSpeaking(false);
+    setActivePlayingId(null);
     if (retryIntervalRef.current) {
       clearInterval(retryIntervalRef.current);
       retryIntervalRef.current = null;

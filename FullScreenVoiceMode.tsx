@@ -238,6 +238,16 @@ export const FullScreenVoiceMode: React.FC<FullScreenVoiceModeProps> = ({
   // Primary Hands-Free Speech Recognition Launcher
   const startListening = useCallback(
     async (isManualTrigger: boolean = false) => {
+      // On Android, continuous listening belongs exclusively to the native
+      // foreground service. Do not start Chrome/Web Speech recognition here: it
+      // competes for the same microphone and triggers Google's "cannot record" error.
+      if (isNativeAndroid() && continuousModeRef.current) {
+        setIsListening(false);
+        setInterimTranscript('');
+        onListeningStateChange?.('वीर का native माइक्रोफोन सुन रहा है');
+        return;
+      }
+
       // 1. Guard conditions: Must be open, not disabled (not speaking/loading), and not already running
       if (!isOpenRef.current) {
         return;
