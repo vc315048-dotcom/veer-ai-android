@@ -607,6 +607,40 @@ export default function App() {
 
   handleSendMessageRef.current = handleSendMessage;
 
+  // Restore the native microphone foreground service when the app is opened.
+  // The UI preference is persisted in localStorage, but that preference alone
+  // does not start Android's actual microphone service after a process restart.
+  useEffect(() => {
+    if (!isNativeAndroid() || !continuousModeEnabledRef.current) return;
+
+    let startAttempted = false;
+    const startRestoredService = async () => {
+      if (startAttempted) return;
+      startAttempted = true;
+      const started = await nativeVoiceService.startContinuousService({
+        onSpeechResult: (spoken) => {
+          if (spoken && spoken.trim()) {
+            handleSendMessageRef.current(spoken.trim());
+          }
+        },
+        onServiceStopped: (reason) => {
+          setStatusText(reason || 'वॉइस सेवा बंद है');
+        },
+        onStatusChanged: (status) => {
+          setStatusText(status);
+        },
+      });
+
+      setStatusText(
+        started
+          ? 'वॉइस सेवा शुरू करने का अनुरोध भेजा गया • नोटिफिकेशन जाँचें'
+          : 'वॉइस सेवा शुरू नहीं हुई • ऐप खुला रखकर अनुमति जाँचें'
+      );
+    };
+
+    startRestoredService();
+  }, []);
+
   const handleClearChat = () => {
     cancelAutoListen();
     handleStopPlayback();
