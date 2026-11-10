@@ -1,9 +1,10 @@
+import { isNativeTTSAvailable, nativeTTS } from './nativeTTS';
 import { apiUrl } from './api';
 import { VoiceSettings } from '../types';
 
 export interface TtsDiagnosticResult {
   success: boolean;
-  method: 'HTMLAudioElement' | 'AudioContext' | 'SpeechSynthesis' | 'None';
+  method: 'NativeAndroidTTS' | 'HTMLAudioElement' | 'AudioContext' | 'SpeechSynthesis' | 'None';
   voicesCount: number;
   hindiVoices: string[];
   cloudTtsStatus: 'SUCCESS' | 'FALLBACK_QUOTA' | 'NETWORK_ERROR' | 'DISABLED';
@@ -175,6 +176,7 @@ class SpeechManager {
   }
 
   public stop() {
+    if (isNativeTTSAvailable()) nativeTTS.stop().catch(() => {});
     this.currentSpeechId++;
     this.isCurrentlySpeaking = false;
 
@@ -570,7 +572,38 @@ class SpeechManager {
       onEnd?.();
     };
 
-    // 1. Try Gemini Cloud TTS if enabled
+    // Android native TextToSpeech: avoids Chrome autoplay/Web Speech restrictions.
+    // This is on-device and does not consume paid API quota.
+    if (isNativeTTSAvailable()) {
+      onStatusUpdate?.('Android की हिन्दी आवाज़ तैयार हो रही है...');
+      try {
+        const availability = await nativeTTS.isAvailable();
+        if (!availability.available) throw new Error('Android Hindi TTS अभी उपलब्ध नहीं है। Speech Services में Hindi voice data जाँचें।');
+        if (this.currentSpeechId !== speechId) return;
+        this.isCurrentlySpeaking = true;
+        onStart?.();
+        await nativeTTS.speak({ text: cleanText, rate: settings.rate || 1.0, pitch: settings.pitch || 1.0 });
+        if (this.currentSpeechId === speechId) {
+          onStatusUpdate?.('वीर बोल चुका है');
+          safeEnd();
+        }
+        return;
+      } catch (nativeErr: any) {
+        console.error('[VEER TTS] Native Android TTS failed:', nativeErr);
+        this.isCurrentlySpeaking = false;
+        if (this.currentSpeechId === speechId) {
+          const message = nativeErr?.message || 'Android की हिन्दी आवाज़ शुरू नहीं हो सकी।';
+          onStatusUpdate?.('Android हिन्दी आवाज़ में समस्या');
+          onError?.(new Error(message));
+          safeEnd();
+        }
+        // Do not fall through to browser SpeechSynthesis inside Android WebView.
+        // That API may be unavailable and masks the real native-plugin error.
+        return;
+      }
+    }
+
+    // 1. Try Gemini Cloud TTS if enabled (only when native TTS is unavailable/fails).
     if (settings.preferGeminiVoice) {
       onStatusUpdate?.('क्लाउड आवाज़ तैयार हो रही है...');
       const abortController = new AbortController();
@@ -694,7 +727,7 @@ class SpeechManager {
       };
 
       let audioActuallyStarted = false;
-      let usedMethod: 'HTMLAudioElement' | 'AudioContext' | 'SpeechSynthesis' | 'None' = 'None';
+      let usedMethod: 'NativeAndroidTTS' | 'HTMLAudioElement' | 'AudioContext' | 'SpeechSynthesis' | 'None' = 'None';
 
       onProgress?.('ऑडियो प्लेबैक शुरू किया जा रहा है...');
 
@@ -703,7 +736,7 @@ class SpeechManager {
         defaultSettings,
         () => {
           audioActuallyStarted = true;
-          usedMethod = cloudAudioBase64 ? 'HTMLAudioElement' : 'SpeechSynthesis';
+          usedMethod = isNativeTTSAvailable() ? 'NativeAndroidTTS' : (cloudAudioBase64 ? 'HTMLAudioElement' : 'SpeechSynthesis');
           onProgress?.(`✅ आवाज़ शुरू हुई (${usedMethod})`);
         },
         () => {
