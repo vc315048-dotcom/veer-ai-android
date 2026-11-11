@@ -589,17 +589,12 @@ class SpeechManager {
         }
         return;
       } catch (nativeErr: any) {
-        console.error('[VEER TTS] Native Android TTS failed:', nativeErr);
+        console.warn('[VEER TTS] Native Android TTS failed; trying fallback:', nativeErr);
         this.isCurrentlySpeaking = false;
-        if (this.currentSpeechId === speechId) {
-          const message = nativeErr?.message || 'Android की हिन्दी आवाज़ शुरू नहीं हो सकी।';
-          onStatusUpdate?.('Android हिन्दी आवाज़ में समस्या');
-          onError?.(new Error(message));
-          safeEnd();
-        }
-        // Do not fall through to browser SpeechSynthesis inside Android WebView.
-        // That API may be unavailable and masks the real native-plugin error.
-        return;
+        if (this.currentSpeechId !== speechId) return;
+        onStatusUpdate?.('Android आवाज़ में समस्या है। दूसरी आवाज़ आज़मा रहा हूँ...');
+        // Continue to Gemini Cloud TTS (if enabled), then Browser TTS.
+        // Do not call safeEnd() here: that would finish before fallback starts.
       }
     }
 
@@ -782,14 +777,14 @@ class SpeechManager {
             voicesCount: voiceInfo.total,
             hindiVoices: voiceInfo.hindiVoices,
             cloudTtsStatus: cloudStatus,
-            error: 'समय समाप्त: प्लेबैक शुरू नहीं हुआ (Android Autoplay या Speech Services की जाँच करें)',
-            details: 'Android Chrome ने बिना यूज़र टच के ऑडियो रोका',
+            error: 'समय समाप्त: Android हिन्दी TTS ने समय पर बोलना शुरू नहीं किया। Speech Services में Hindi voice data जाँचें।',
+            details: 'Android TTS से आवाज़ शुरू नहीं हुई; Native TTS plugin और Hindi voice data जाँचें।',
             audioStarted: false,
           };
           this.lastDiagnosticResult = result;
           resolve(result);
         }
-      }, 5000);
+      }, 12000);
     });
   }
 
