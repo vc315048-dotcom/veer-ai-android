@@ -23,7 +23,6 @@ import androidx.annotation.Nullable;
 import androidx.core.app.NotificationCompat;
 
 import java.util.ArrayList;
-import java.util.Locale;
 
 /**
  * VeerVoiceForegroundService
@@ -54,12 +53,6 @@ public class VeerVoiceForegroundService extends Service {
     private Handler mainHandler;
     private Runnable restartListeningRunnable;
     private boolean isListeningActive = false;
-    // Wake phrases selected by the user: "Suno Veer" and "Suno Jarvis".
-    // SpeechRecognizer supplies a full utterance; we gate forwarding until a wake phrase is heard.
-    private boolean awaitingCommandAfterWakeWord = false;
-    private long wakeWordTimestampMs = 0L;
-    private static final long WAKE_COMMAND_WINDOW_MS = 10000L;
-
 
     public interface VoiceServiceListener {
         void onSpeechResult(String text);
@@ -154,7 +147,7 @@ public class VeerVoiceForegroundService extends Service {
 
         return new NotificationCompat.Builder(this, CHANNEL_ID)
                 .setContentTitle("वीर वॉइस असिस्टेंट सक्रिय है")
-                .setContentText("स्क्रीन बंद होने पर भी सुन रहा है • “सुनो वीर” या “सुनो जार्विस” बोलें")
+                .setContentText("स्क्रीन बंद होने पर भी आपकी आवाज़ सुन रहा है • वीर से बोलें")
                 .setSmallIcon(android.R.drawable.ic_btn_speak_now)
                 .setContentIntent(openPendingIntent)
                 .setOngoing(true)
@@ -206,61 +199,6 @@ public class VeerVoiceForegroundService extends Service {
         if (serviceListener != null) {
             serviceListener.onStatusChanged("वीर सुन रहा है (स्क्रीन बंद होने पर भी सक्रिय)");
         }
-    }
-
-
-    private String normalizeWakeText(String text) {
-        if (text == null) return "";
-        return text.toLowerCase(Locale.ROOT)
-                .replace('।', ' ')
-                .replaceAll("[,!?;:।]+", " ")
-                .replaceAll("\\s+", " ")
-                .trim();
-    }
-
-    /**
-     * Returns the command after one of the user's wake phrases, or null when
-     * this utterance is only background speech and should not reach the AI.
-     */
-    private String extractCommandAfterWakeWord(String spokenText) {
-        String normalized = normalizeWakeText(spokenText);
-        if (normalized.isEmpty()) return null;
-
-        // Accept common Hindi-script and speech-to-text transliterations.
-        String[] wakePhrases = {
-                "suno veer", "suno vir", "sunno veer",
-                "suno jarvis", "suno jars", "sunno jarvis",
-                "सुनो वीर", "सुनो विर", "सुनो जार्विस", "सुनो जार्विस"
-        };
-
-        for (String phrase : wakePhrases) {
-            int at = normalized.indexOf(phrase);
-            if (at >= 0) {
-                String command = (normalized.substring(0, at) + " " +
-                        normalized.substring(at + phrase.length())).trim();
-                command = command.replaceAll("^([,\\s]+)", "").trim();
-                awaitingCommandAfterWakeWord = true;
-                wakeWordTimestampMs = android.os.SystemClock.elapsedRealtime();
-                if (!command.isEmpty()) {
-                    awaitingCommandAfterWakeWord = false;
-                    return command;
-                }
-                if (serviceListener != null) {
-                    serviceListener.onStatusChanged("जी, बोलिए… मैं सुन रहा हूँ");
-                }
-                return null;
-            }
-        }
-
-        if (awaitingCommandAfterWakeWord) {
-            long elapsed = android.os.SystemClock.elapsedRealtime() - wakeWordTimestampMs;
-            if (elapsed <= WAKE_COMMAND_WINDOW_MS) {
-                awaitingCommandAfterWakeWord = false;
-                return spokenText.trim();
-            }
-            awaitingCommandAfterWakeWord = false;
-        }
-        return null;
     }
 
     private void initAndStartSpeechRecognizer() {
@@ -319,21 +257,28 @@ public class VeerVoiceForegroundService extends Service {
                     @Override
                     public void onResults(Bundle results) {
                         isListeningActive = false;
+                        boolean recognizedCommand = false;
                         ArrayList<String> matches = results.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION);
                         if (matches != null && !matches.isEmpty()) {
                             String spokenText = matches.get(0);
                             if (spokenText != null && !spokenText.trim().isEmpty()) {
-                                Log.d(TAG, "Recognized spoken text: " + spokenText);
-                                String command = extractCommandAfterWakeWord(spokenText);
-                                if (command != null && !command.isEmpty() && serviceListener != null) {
-                                    Log.d(TAG, "Wake word accepted; forwarding command: " + command);
-                                    serviceListener.onSpeechResult(command);
+                                recognizedCommand = true;
+                                Log.d(TAG, "Recognized spoken text; pausing mic before callback: " + spokenText);
+
+                                // IMPORTANT: Pause the native microphone BEFORE sending the
+                                // result to JavaScript. Otherwise the old 450 ms restart can
+                                // reopen SpeechRecognizer while VEER is generating/speaking.
+                                pauseRecognition();
+
+                                if (serviceListener != null) {
+                                    serviceListener.onSpeechResult(spokenText.trim());
                                 }
                             }
                         }
 
-                        // Seamless continuous listening restart if still active
-                        if (isServiceRunning && !isPaused) {
+                        // Restart only after silence/no usable result. A recognized user
+                        // turn stays paused until JavaScript explicitly resumes after TTS.
+                        if (!recognizedCommand && isServiceRunning && !isPaused) {
                             scheduleRestartListening(450);
                         }
                     }
@@ -388,7 +333,6 @@ public class VeerVoiceForegroundService extends Service {
 
     public void pauseRecognition() {
         isPaused = true;
-        awaitingCommandAfterWakeWord = false;
         if (restartListeningRunnable != null) {
             mainHandler.removeCallbacks(restartListeningRunnable);
             restartListeningRunnable = null;
@@ -418,7 +362,6 @@ public class VeerVoiceForegroundService extends Service {
 
     private void stopContinuousListening(String reason) {
         isServiceRunning = false;
-        awaitingCommandAfterWakeWord = false;
         isPaused = false;
         isListeningActive = false;
 
