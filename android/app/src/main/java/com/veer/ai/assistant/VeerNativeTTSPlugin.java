@@ -3,6 +3,7 @@ package com.veer.ai.assistant;
 import android.speech.tts.TextToSpeech;
 import android.speech.tts.UtteranceProgressListener;
 import android.util.Log;
+import android.media.AudioAttributes;
 
 import com.getcapacitor.JSObject;
 import com.getcapacitor.Plugin;
@@ -53,6 +54,13 @@ public class VeerNativeTTSPlugin extends Plugin {
             try {
                 tts.stop();
                 tts.setLanguage(new Locale("hi", "IN"));
+                // Route spoken replies as media speech so the phone's media volume controls them.
+                if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.LOLLIPOP) {
+                    tts.setAudioAttributes(new AudioAttributes.Builder()
+                            .setUsage(AudioAttributes.USAGE_MEDIA)
+                            .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
+                            .build());
+                }
                 tts.setSpeechRate((float)Math.max(0.5, Math.min(1.5, rate)));
                 tts.setPitch((float)Math.max(0.7, Math.min(1.3, pitch)));
                 String utteranceId = "veer-" + System.nanoTime();
@@ -86,8 +94,14 @@ public class VeerNativeTTSPlugin extends Plugin {
 
     @PluginMethod
     public void stop(PluginCall call) {
-        try { if (tts != null) tts.stop(); call.resolve(); }
-        catch (Exception e) { call.reject(e.getMessage()); }
+        getActivity().runOnUiThread(() -> {
+            try {
+                if (tts != null) tts.stop();
+                call.resolve();
+            } catch (Exception e) {
+                call.reject(e.getMessage());
+            }
+        });
     }
 
     @PluginMethod
