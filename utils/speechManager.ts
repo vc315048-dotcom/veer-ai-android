@@ -175,8 +175,10 @@ class SpeechManager {
       .trim();
   }
 
-  public stop() {
-    if (isNativeTTSAvailable()) nativeTTS.stop().catch(() => {});
+  public stop(stopNativeTTS: boolean = true) {
+    // Normal user stop still stops Android TTS. speak() passes false and
+    // awaits the native stop itself so STOP cannot race with the next SPEAK.
+    if (stopNativeTTS && isNativeTTSAvailable()) nativeTTS.stop().catch(() => {});
     this.currentSpeechId++;
     this.isCurrentlySpeaking = false;
 
@@ -543,7 +545,9 @@ class SpeechManager {
     onError?: (err: any) => void,
     onStatusUpdate?: (status: string) => void
   ) {
-    this.stop();
+    // Clear browser/audio state here, but do not fire-and-forget Android STOP.
+    // The native branch below awaits STOP before issuing the next SPEAK.
+    this.stop(false);
     const speechId = ++this.currentSpeechId;
     const cleanText = this.cleanTextForSpeech(text);
 
@@ -577,6 +581,10 @@ class SpeechManager {
     if (isNativeTTSAvailable()) {
       onStatusUpdate?.('Android की हिन्दी आवाज़ तैयार हो रही है...');
       try {
+        // Serialize Android TTS commands: wait until any previous utterance
+        // has actually stopped before starting this answer.
+        await nativeTTS.stop();
+        if (this.currentSpeechId !== speechId) return;
         const availability = await nativeTTS.isAvailable();
         if (!availability.available) throw new Error('Android Hindi TTS अभी उपलब्ध नहीं है। Speech Services में Hindi voice data जाँचें।');
         if (this.currentSpeechId !== speechId) return;
