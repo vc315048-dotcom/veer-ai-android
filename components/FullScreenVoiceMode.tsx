@@ -234,10 +234,19 @@ export const FullScreenVoiceMode: React.FC<FullScreenVoiceModeProps> = ({
     },
     [stopListening, onListeningStateChange, onSendMessage]
   );
-
-  // Primary Hands-Free Speech Recognition Launcher
+    // Primary Hands-Free Speech Recognition Launcher
   const startListening = useCallback(
     async (isManualTrigger: boolean = false) => {
+      // On Android, continuous listening belongs exclusively to the native
+      // foreground service. Do not start Chrome/Web Speech recognition here: it
+      // competes for the same microphone and triggers Google's "cannot record" error.
+      if (isNativeAndroid() && continuousModeRef.current) {
+        setIsListening(false);
+        setInterimTranscript('');
+        onListeningStateChange?.('वीर का native माइक्रोफोन सुन रहा है');
+        return;
+      }
+
       // 1. Guard conditions: Must be open, not disabled (not speaking/loading), and not already running
       if (!isOpenRef.current) {
         return;
@@ -497,8 +506,8 @@ export const FullScreenVoiceMode: React.FC<FullScreenVoiceModeProps> = ({
       commitSpeechAndSend,
     ]
   );
-
-  // Requirement 1 & 4: Auto-start listening and unlock audio playback when Voice Mode opens
+    // Start automatically only when Continuous Mode is ON.
+  // When it is OFF, the microphone stays stopped until the user taps the orb.
   useEffect(() => {
     if (isOpen) {
       speechManager.unlockAudio();
@@ -508,13 +517,20 @@ export const FullScreenVoiceMode: React.FC<FullScreenVoiceModeProps> = ({
       setInterimTranscript('');
       hasCommittedRef.current = false;
 
-      // Immediate start with a minimal 80ms tick so DOM renders first
-      const timer = setTimeout(() => {
-        if (!isActivelyListeningRef.current && !isStartingRef.current && !isMicDisabledRef.current) {
-          startListening(true);
-        }
-      }, 80);
-      return () => clearTimeout(timer);
+      if (continuousModeRef.current) {
+        const timer = setTimeout(() => {
+          if (
+            isOpenRef.current &&
+            continuousModeRef.current &&
+            !isActivelyListeningRef.current &&
+            !isStartingRef.current &&
+            !isMicDisabledRef.current
+          ) {
+            startListening(false);
+          }
+        }, 250);
+        return () => clearTimeout(timer);
+      }
     } else {
       sessionIdRef.current++;
       stopListening();
@@ -680,8 +696,7 @@ export const FullScreenVoiceMode: React.FC<FullScreenVoiceModeProps> = ({
           </button>
         </div>
       </header>
-
-      {/* Main Conversation Canvas (Clean, Responsive, Accurate Status) */}
+            {/* Main Conversation Canvas (Clean, Responsive, Accurate Status) */}
       <main className="relative z-10 flex-1 flex flex-col items-center justify-center px-3 my-auto">
         <div className="w-full max-w-sm flex flex-col items-center justify-center space-y-4">
           {/* 1. Live Spoken Words (While speaking into mic) */}
