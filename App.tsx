@@ -19,7 +19,7 @@ import { apiUrl } from './utils/api';
 
 const STORAGE_KEY_MESSAGES = 'veer_messages_v1';
 const STORAGE_KEY_SETTINGS = 'veer_settings_v1';
-const STORAGE_KEY_CONTINUOUS_MODE = 'veer_continuous_mode_v3';
+const STORAGE_KEY_CONTINUOUS_MODE = 'veer_continuous_mode_v4';
 
 export default function App() {
   const [messages, setMessages] = useState<ChatMessage[]>(() => {
@@ -53,7 +53,7 @@ export default function App() {
         return saved === 'true';
       }
     } catch (e) {}
-    return true; // Enabled by default for natural back-and-forth conversation
+    return false; // Continuous listening is OFF by default for every new user
   });
 
   const [isLoading, setIsLoading] = useState<boolean>(false);
