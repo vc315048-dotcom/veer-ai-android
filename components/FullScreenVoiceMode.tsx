@@ -300,7 +300,6 @@ export const FullScreenVoiceMode: React.FC<FullScreenVoiceModeProps> = ({
       setShowIframeNotice(false);
       latestTranscriptRef.current = '';
 
-      const SpeechRecognition =
         
       // Android manual microphone: use native Hindi speech plugin.
       if (isNativeAndroid()) {
@@ -361,10 +360,12 @@ export const FullScreenVoiceMode: React.FC<FullScreenVoiceModeProps> = ({
         return;
       }
       
-        (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
 
+      const SpeechRecognition =
+  (window as any).SpeechRecognition ||
+  (window as any).webkitSpeechRecognition;
       if (!SpeechRecognition) {
-        showTemporaryError(
+  showTemporaryError(
           'ब्राउज़र में वॉइस रिकॉग्निशन समर्थित नहीं है। कृपया चैट बॉक्स में लिखकर बात करें।',
           5000
         );
