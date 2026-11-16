@@ -45,7 +45,7 @@ export const AndroidHeader: React.FC<AndroidHeaderProps> = ({
   }, []);
 
   return (
-    <header className="flex flex-col bg-slate-950/95 backdrop-blur-md border-b border-slate-800/80 sticky top-0 z-30 select-none">
+    <header className="flex flex-col pt-[max(env(safe-area-inset-top),24px)] bg-slate-950/95 backdrop-blur-md border-b border-slate-800/80 sticky top-0 z-30 select-none">
 
       {/* VEER Brand App Bar */}
       <div className="flex items-center justify-between px-3 py-2.5">
