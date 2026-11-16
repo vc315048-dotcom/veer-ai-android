@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import {
   Shield,
@@ -7,6 +6,7 @@ import {
   Settings,
   Trash2,
   ExternalLink,
+  MoreVertical,
 } from 'lucide-react';
 import { VoiceSettings } from '../types';
 
@@ -34,6 +34,7 @@ export const AndroidHeader: React.FC<AndroidHeaderProps> = ({
   onToggleContinuousMode,
 }) => {
   const [isInIframe, setIsInIframe] = useState(false);
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
 
   useEffect(() => {
     try {
@@ -49,6 +50,7 @@ export const AndroidHeader: React.FC<AndroidHeaderProps> = ({
       {/* VEER Brand App Bar */}
       <div className="flex items-center justify-between px-3 py-2.5">
 
+        {/* VEER Logo, Name and Status */}
         <div className="flex items-center space-x-2.5">
 
           {/* VEER Shield Logo */}
@@ -108,101 +110,139 @@ export const AndroidHeader: React.FC<AndroidHeaderProps> = ({
           </div>
         </div>
 
-        {/* Header Controls */}
-        <div className="flex items-center space-x-1.5">
+        {/* Three Dot Menu */}
+        <div className="relative">
 
-          {/* Continuous Listening ON/OFF */}
-          {onToggleContinuousMode && (
-            <button
-              type="button"
-              onClick={() => onToggleContinuousMode()}
-              className={`px-2.5 py-1.5 rounded-xl border text-[11px] font-bold flex items-center gap-1.5 transition-all shadow-sm active:scale-95 ${
-                continuousModeEnabled
-                  ? 'bg-emerald-950/80 border-emerald-500/70 text-emerald-300 ring-1 ring-emerald-500/40'
-                  : 'bg-slate-900/90 border-slate-700/80 text-slate-400'
-              }`}
-              title={
-                continuousModeEnabled
-                  ? 'लगातार सुनना बंद करें'
-                  : 'लगातार सुनना चालू करें'
-              }
-              aria-label="Toggle continuous listening"
+          <button
+            type="button"
+            onClick={() => setIsMenuOpen((open) => !open)}
+            className="p-2.5 rounded-xl bg-slate-900/90 text-slate-200 border border-slate-700/80 hover:bg-slate-800 transition-all active:scale-95"
+            title="मेन्यू खोलें"
+            aria-label="Open menu"
+            aria-expanded={isMenuOpen}
+            aria-haspopup="true"
+          >
+            <MoreVertical className="w-5 h-5" />
+          </button>
+
+          {/* Dropdown Menu */}
+          {isMenuOpen && (
+            <div
+              className="absolute right-0 top-full mt-2 w-60 rounded-2xl bg-slate-900 border border-slate-700 shadow-2xl p-2 z-50"
+              role="menu"
             >
-              <span
-                className={`w-2 h-2 rounded-full ${
-                  continuousModeEnabled
-                    ? 'bg-emerald-400 animate-pulse'
-                    : 'bg-slate-500'
-                }`}
-              />
 
-              <span>लगातार</span>
+              {/* Continuous Listening */}
+              {onToggleContinuousMode && (
+                <button
+                  type="button"
+                  role="menuitem"
+                  onClick={() => {
+                    onToggleContinuousMode();
+                    setIsMenuOpen(false);
+                  }}
+                  className="w-full flex items-center justify-between gap-3 px-3 py-3 rounded-xl text-sm text-slate-200 hover:bg-slate-800 transition-all"
+                >
+                  <span className="flex items-center gap-3">
+                    <span
+                      className={`w-2.5 h-2.5 rounded-full ${
+                        continuousModeEnabled
+                          ? 'bg-emerald-400 animate-pulse'
+                          : 'bg-slate-500'
+                      }`}
+                    />
+                    लगातार सुनना
+                  </span>
 
-              <span>
-                {continuousModeEnabled ? 'ON' : 'OFF'}
-              </span>
-            </button>
+                  <span
+                    className={`text-xs font-bold ${
+                      continuousModeEnabled
+                        ? 'text-emerald-400'
+                        : 'text-slate-400'
+                    }`}
+                  >
+                    {continuousModeEnabled ? 'ON' : 'OFF'}
+                  </span>
+                </button>
+              )}
+
+              {/* Standalone Tab */}
+              {isInIframe && (
+                <a
+                  href={window.location.href}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  role="menuitem"
+                  onClick={() => setIsMenuOpen(false)}
+                  className="w-full flex items-center gap-3 px-3 py-3 rounded-xl text-sm text-slate-200 hover:bg-slate-800 transition-all"
+                >
+                  <ExternalLink className="w-4 h-4 text-amber-400" />
+                  अलग टैब में खोलें
+                </a>
+              )}
+
+              {/* Voice Output */}
+              <button
+                type="button"
+                role="menuitem"
+                onClick={() => {
+                  onToggleAutoSpeak();
+                  setIsMenuOpen(false);
+                }}
+                className="w-full flex items-center justify-between gap-3 px-3 py-3 rounded-xl text-sm text-slate-200 hover:bg-slate-800 transition-all"
+              >
+                <span className="flex items-center gap-3">
+                  {voiceSettings.autoSpeak ? (
+                    <Volume2 className="w-4 h-4 text-cyan-400" />
+                  ) : (
+                    <VolumeX className="w-4 h-4 text-slate-400" />
+                  )}
+                  आवाज़
+                </span>
+
+                <span
+                  className={`text-xs font-bold ${
+                    voiceSettings.autoSpeak
+                      ? 'text-cyan-400'
+                      : 'text-slate-400'
+                  }`}
+                >
+                  {voiceSettings.autoSpeak ? 'ON' : 'OFF'}
+                </span>
+              </button>
+
+              <div className="h-px bg-slate-700/80 my-1" />
+
+              {/* Settings */}
+              <button
+                type="button"
+                role="menuitem"
+                onClick={() => {
+                  onOpenSettings();
+                  setIsMenuOpen(false);
+                }}
+                className="w-full flex items-center gap-3 px-3 py-3 rounded-xl text-sm text-slate-200 hover:bg-slate-800 transition-all"
+              >
+                <Settings className="w-4 h-4 text-amber-400" />
+                सेटिंग्स
+              </button>
+
+              {/* Clear Chat */}
+              <button
+                type="button"
+                role="menuitem"
+                onClick={() => {
+                  onClearChat();
+                  setIsMenuOpen(false);
+                }}
+                className="w-full flex items-center gap-3 px-3 py-3 rounded-xl text-sm text-slate-200 hover:bg-slate-800 transition-all"
+              >
+                <Trash2 className="w-4 h-4 text-rose-400" />
+                बातचीत साफ़ करें
+              </button>
+
+            </div>
           )}
-
-          {/* Open Standalone Tab */}
-          {isInIframe && (
-            <a
-              href={window.location.href}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="p-2 rounded-xl bg-amber-500/10 text-amber-300 border border-amber-500/30 transition-all flex items-center"
-              title="अलग टैब में खोलें"
-              aria-label="Open in standalone tab"
-            >
-              <ExternalLink className="w-4 h-4" />
-            </a>
-          )}
-
-          {/* Auto Speak Toggle */}
-          <button
-            type="button"
-            onClick={onToggleAutoSpeak}
-            className={`p-2 rounded-xl border transition-all ${
-              voiceSettings.autoSpeak
-                ? 'bg-cyan-950/60 text-cyan-300 border-cyan-800/60'
-                : 'bg-slate-900/80 text-slate-400 border-slate-800'
-            }`}
-            title={
-              voiceSettings.autoSpeak
-                ? 'आवाज़ बंद करें'
-                : 'आवाज़ चालू करें'
-            }
-            aria-label="Toggle voice output"
-          >
-            {voiceSettings.autoSpeak ? (
-              <Volume2 className="w-4 h-4 text-cyan-400" />
-            ) : (
-              <VolumeX className="w-4 h-4 text-slate-400" />
-            )}
-          </button>
-
-          {/* Clear Chat */}
-          <button
-            type="button"
-            onClick={onClearChat}
-            className="p-2 rounded-xl bg-slate-900/80 text-slate-400 border border-slate-800 hover:text-rose-400 transition-all"
-            title="बातचीत साफ़ करें"
-            aria-label="Clear chat"
-          >
-            <Trash2 className="w-4 h-4" />
-          </button>
-
-          {/* Settings */}
-          <button
-            type="button"
-            onClick={onOpenSettings}
-            className="p-2 rounded-xl bg-slate-900/80 text-slate-400 border border-slate-800 hover:text-amber-400 transition-all"
-            title="सेटिंग्स"
-            aria-label="Settings"
-          >
-            <Settings className="w-4 h-4" />
-          </button>
-
         </div>
       </div>
     </header>
