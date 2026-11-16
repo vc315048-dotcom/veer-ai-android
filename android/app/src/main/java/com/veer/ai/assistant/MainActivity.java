@@ -10,6 +10,7 @@ public class MainActivity extends BridgeActivity {
         registerPlugin(VeerNativeTTSPlugin.class);
         registerPlugin(VoiceMicPlugin.class);
         registerPlugin(VeerPhoneControlPlugin.class);
+        registerPlugin(VeerManualSpeechPlugin.class);
         super.onCreate(savedInstanceState);
     }
 }
