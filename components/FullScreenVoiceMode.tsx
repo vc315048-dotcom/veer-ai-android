@@ -4,7 +4,7 @@ import { soundFx } from '../utils/soundEffects';
 import { speechManager, TtsDiagnosticResult } from '../utils/speechManager';
 import { isNativeAndroid, nativeVoiceService } from '../utils/nativeVoiceService';
 import { ChatMessage } from '../types';
-
+import ManualSpeech from '../utils/manualSpeech';
 interface FullScreenVoiceModeProps {
   isOpen: boolean;
   onClose: () => void;
@@ -91,6 +91,10 @@ export const FullScreenVoiceMode: React.FC<FullScreenVoiceModeProps> = ({
   const animIntervalRef = useRef<any>(null);
   const errorTimerRef = useRef<any>(null);
   const lastTriggerHandledRef = useRef<number>(0);
+    // Manual Android speech session references
+  const manualSpeechSessionRef = useRef<number>(0);
+  const manualSpeechActiveRef = useRef<boolean>(false);
+  const manualSpeechPartialListenerRef = useRef<{ remove: () => Promise<void> } | null>(null);
 
   // Sync live user prompt from parent if available
   useEffect(() => {
@@ -172,6 +176,20 @@ export const FullScreenVoiceMode: React.FC<FullScreenVoiceModeProps> = ({
     isStartingRef.current = false;
     isActivelyListeningRef.current = false;
 
+    // Cancel any active Android manual speech session.
+    manualSpeechSessionRef.current++;
+    manualSpeechActiveRef.current = false;
+
+    if (manualSpeechPartialListenerRef.current) {
+      const listener = manualSpeechPartialListenerRef.current;
+      manualSpeechPartialListenerRef.current = null;
+      void listener.remove().catch(() => {});
+    }
+
+    if (isNativeAndroid()) {
+      void ManualSpeech.cancelListening().catch(() => {});
+    }
+    
     if (silenceCommitTimerRef.current) {
       clearTimeout(silenceCommitTimerRef.current);
       silenceCommitTimerRef.current = null;
@@ -283,6 +301,66 @@ export const FullScreenVoiceMode: React.FC<FullScreenVoiceModeProps> = ({
       latestTranscriptRef.current = '';
 
       const SpeechRecognition =
+        
+      // Android manual microphone: use native Hindi speech plugin.
+      if (isNativeAndroid()) {
+        const manualSession = ++manualSpeechSessionRef.current;
+        manualSpeechActiveRef.current = true;
+
+        isStartingRef.current = false;
+        isActivelyListeningRef.current = true;
+        setIsListening(true);
+        onListeningStateChange?.('वीर सुन रहा है... अब बोलिए');
+
+        let partialListener: { remove: () => Promise<void> } | null = null;
+
+        try {
+          partialListener = await ManualSpeech.addListener(
+            'partialResult',
+            (data) => {
+              if (manualSession !== manualSpeechSessionRef.current) return;
+
+              setInterimTranscript(data.text);
+              latestTranscriptRef.current = data.text;
+            }
+          );
+
+          manualSpeechPartialListenerRef.current = partialListener;
+
+          const result = await ManualSpeech.startListening();
+
+          if (manualSession !== manualSpeechSessionRef.current) return;
+
+          manualSpeechActiveRef.current = false;
+          isActivelyListeningRef.current = false;
+          setIsListening(false);
+
+          await partialListener.remove();
+          manualSpeechPartialListenerRef.current = null;
+
+          if (result?.text?.trim()) {
+            commitSpeechAndSend(result.text.trim());
+          } else {
+            showTemporaryError('आवाज़ समझ में नहीं आई। दोबारा बोलें।');
+          }
+        } catch (error: any) {
+          if (manualSession === manualSpeechSessionRef.current) {
+            manualSpeechActiveRef.current = false;
+            isActivelyListeningRef.current = false;
+            setIsListening(false);
+            showTemporaryError(error?.message || 'माइक शुरू नहीं हो सका।');
+          }
+
+          if (partialListener) {
+            await partialListener.remove().catch(() => {});
+          }
+
+          manualSpeechPartialListenerRef.current = null;
+        }
+
+        return;
+      }
+      
         (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
 
       if (!SpeechRecognition) {
