@@ -585,8 +585,10 @@ export const FullScreenVoiceMode: React.FC<FullScreenVoiceModeProps> = ({
       commitSpeechAndSend,
     ]
   );
-    // Start automatically only when Continuous Mode is ON.
-  // When it is OFF, the microphone stays stopped until the user taps the orb.
+  
+  // Start listening automatically when Android Voice Mode opens.
+  // Continuous mode uses the native foreground service.
+  // Manual mode starts one native Hindi speech session.
   useEffect(() => {
     if (isOpen) {
       speechManager.unlockAudio();
@@ -596,29 +598,38 @@ export const FullScreenVoiceMode: React.FC<FullScreenVoiceModeProps> = ({
       setInterimTranscript('');
       hasCommittedRef.current = false;
 
-      if (continuousModeRef.current) {
+      const shouldStartManualAndroid =
+        isNativeAndroid() && !continuousModeRef.current;
+
+      if (continuousModeRef.current || shouldStartManualAndroid) {
         const timer = setTimeout(() => {
           if (
             isOpenRef.current &&
-            continuousModeRef.current &&
             !isActivelyListeningRef.current &&
             !isStartingRef.current &&
             !isMicDisabledRef.current
           ) {
-            startListening(false);
+            if (isNativeAndroid() && !continuousModeRef.current) {
+              startListening(true);
+            } else if (continuousModeRef.current) {
+              startListening(false);
+            }
           }
-        }, 250);
+        }, 300);
+
         return () => clearTimeout(timer);
       }
     } else {
       sessionIdRef.current++;
       stopListening();
+
       if (restartListenTimeoutRef.current) {
         clearTimeout(restartListenTimeoutRef.current);
         restartListenTimeoutRef.current = null;
       }
     }
   }, [isOpen, startListening, stopListening, onStopPlayback]);
+  
 
   // Requirement 4: Pause/stop listening immediately whenever AI is preparing or speaking
   useEffect(() => {
