@@ -630,17 +630,6 @@ export const FullScreenVoiceMode: React.FC<FullScreenVoiceModeProps> = ({
     }
   }, [isOpen, startListening, stopListening, onStopPlayback]);
   
-    } else {
-      sessionIdRef.current++;
-      stopListening();
-
-      if (restartListenTimeoutRef.current) {
-        clearTimeout(restartListenTimeoutRef.current);
-        restartListenTimeoutRef.current = null;
-      }
-    }
-  }, [isOpen, startListening, stopListening, onStopPlayback]);
-  
 
   // Requirement 4: Pause/stop listening immediately whenever AI is preparing or speaking
   useEffect(() => {
