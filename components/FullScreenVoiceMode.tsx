@@ -258,7 +258,7 @@ export const FullScreenVoiceMode: React.FC<FullScreenVoiceModeProps> = ({
       // On Android, continuous listening belongs exclusively to the native
       // foreground service. Do not start Chrome/Web Speech recognition here: it
       // competes for the same microphone and triggers Google's "cannot record" error.
-      if (isNativeAndroid() && continuousModeRef.current) {
+      if (isNativeAndroid() && continuousModeRef.current && !isManualTrigger) {
         setIsListening(false);
         setInterimTranscript('');
         onListeningStateChange?.('वीर का native माइक्रोफोन सुन रहा है');
@@ -301,8 +301,12 @@ export const FullScreenVoiceMode: React.FC<FullScreenVoiceModeProps> = ({
       latestTranscriptRef.current = '';
 
         
-      // Android manual microphone: use native Hindi speech plugin.
+      // Android manual microphone: temporarily pause the foreground service
+      // so the one-shot recognizer can safely take exclusive microphone access.
       if (isNativeAndroid()) {
+        if (continuousModeRef.current) {
+          await nativeVoiceService.pauseListening();
+        }
         const manualSession = ++manualSpeechSessionRef.current;
         manualSpeechActiveRef.current = true;
 
@@ -341,6 +345,9 @@ export const FullScreenVoiceMode: React.FC<FullScreenVoiceModeProps> = ({
             commitSpeechAndSend(result.text.trim());
           } else {
             showTemporaryError('आवाज़ समझ में नहीं आई। दोबारा बोलें।');
+            if (continuousModeRef.current) {
+              await nativeVoiceService.resumeListening();
+            }
           }
         } catch (error: any) {
           if (manualSession === manualSpeechSessionRef.current) {
@@ -348,6 +355,9 @@ export const FullScreenVoiceMode: React.FC<FullScreenVoiceModeProps> = ({
             isActivelyListeningRef.current = false;
             setIsListening(false);
             showTemporaryError(error?.message || 'माइक शुरू नहीं हो सका।');
+            if (continuousModeRef.current) {
+              await nativeVoiceService.resumeListening();
+            }
           }
 
           if (partialListener) {
