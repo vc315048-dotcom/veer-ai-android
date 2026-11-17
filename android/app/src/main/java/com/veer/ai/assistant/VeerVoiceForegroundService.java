@@ -53,7 +53,7 @@ public class VeerVoiceForegroundService extends Service {
     private Handler mainHandler;
     private Runnable restartListeningRunnable;
     private boolean isListeningActive = false;
-
+private boolean awaitingWakeCommand = false;
     public interface VoiceServiceListener {
         void onSpeechResult(String text);
         void onPartialResult(String text);
@@ -251,37 +251,74 @@ public class VeerVoiceForegroundService extends Service {
                         } else {
                             // Transient error: retry with brief backoff
                             scheduleRestartListening(1000);
-                        }
-                    }
+                            
 
-                    @Override
-                    public void onResults(Bundle results) {
-                        isListeningActive = false;
-                        boolean recognizedCommand = false;
-                        ArrayList<String> matches = results.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION);
-                        if (matches != null && !matches.isEmpty()) {
-                            String spokenText = matches.get(0);
-                            if (spokenText != null && !spokenText.trim().isEmpty()) {
-                                recognizedCommand = true;
-                                Log.d(TAG, "Recognized spoken text; pausing mic before callback: " + spokenText);
+@Override
+public void onResults(Bundle results) {
+    isListeningActive = false;
 
-                                // IMPORTANT: Pause the native microphone BEFORE sending the
-                                // result to JavaScript. Otherwise the old 450 ms restart can
-                                // reopen SpeechRecognizer while VEER is generating/speaking.
-                                pauseRecognition();
+    ArrayList<String> matches = results.getStringArrayList(
+            SpeechRecognizer.RESULTS_RECOGNITION);
 
-                                if (serviceListener != null) {
-                                    serviceListener.onSpeechResult(spokenText.trim());
-                                }
-                            }
-                        }
+    String spokenText = (matches != null && !matches.isEmpty())
+            ? matches.get(0) : null;
 
-                        // Restart only after silence/no usable result. A recognized user
-                        // turn stays paused until JavaScript explicitly resumes after TTS.
-                        if (!recognizedCommand && isServiceRunning && !isPaused) {
-                            scheduleRestartListening(450);
-                        }
-                    }
+    if (spokenText == null || spokenText.trim().isEmpty()) {
+        if (isServiceRunning && !isPaused) {
+            scheduleRestartListening(450);
+        }
+        return;
+    }
+
+    String commandText;
+
+    if (awaitingWakeCommand) {
+        commandText = spokenText.trim();
+        awaitingWakeCommand = false;
+    } else {
+        String normalized = spokenText.trim().toLowerCase(
+                java.util.Locale.ROOT);
+
+        java.util.regex.Matcher wakeMatcher =
+                java.util.regex.Pattern.compile(
+                        "(वीर\\s*सुनो?|veer\\s*suno?)",
+                        java.util.regex.Pattern.CASE_INSENSITIVE)
+                .matcher(normalized);
+
+        if (!wakeMatcher.find()) {
+            Log.d(TAG, "Ignored speech without VEER wake word");
+            if (isServiceRunning && !isPaused) {
+                scheduleRestartListening(450);
+            }
+            return;
+        }
+
+        commandText = spokenText.substring(wakeMatcher.end()).trim();
+        commandText = commandText.replaceFirst(
+                "^[\\s,，:;.!?।-]+", "").trim();
+
+        if (commandText.isEmpty()) {
+            awaitingWakeCommand = true;
+
+            if (serviceListener != null) {
+                serviceListener.onStatusChanged(
+                        "जी, बोलिए। वीर सुन रहा है...");
+            }
+
+            if (isServiceRunning && !isPaused) {
+                scheduleRestartListening(350);
+            }
+            return;
+        }
+    }
+
+    Log.d(TAG, "VEER wake word accepted");
+    pauseRecognition();
+
+    if (serviceListener != null) {
+        serviceListener.onSpeechResult(commandText);
+    }
+}
 
                     @Override
                     public void onPartialResults(Bundle partialResults) {
