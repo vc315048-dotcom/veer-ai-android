@@ -4,6 +4,8 @@ import android.speech.tts.TextToSpeech;
 import android.speech.tts.UtteranceProgressListener;
 import android.util.Log;
 import android.media.AudioAttributes;
+import android.media.AudioManager;
+import android.os.Bundle;
 
 import com.getcapacitor.JSObject;
 import com.getcapacitor.Plugin;
@@ -263,10 +265,24 @@ public class VeerNativeTTSPlugin extends Plugin {
                         ? TextToSpeech.QUEUE_FLUSH
                         : TextToSpeech.QUEUE_ADD;
 
+                    // Explicitly route speech to the media stream at full
+                    // TTS volume. Some Android/OEM engines otherwise inherit a
+                    // muted notification/assistant stream and appear to succeed
+                    // while the user hears nothing.
+                    Bundle speechParams = new Bundle();
+                    speechParams.putFloat(
+                        TextToSpeech.Engine.KEY_PARAM_VOLUME,
+                        1.0f
+                    );
+                    speechParams.putInt(
+                        TextToSpeech.Engine.KEY_PARAM_STREAM,
+                        AudioManager.STREAM_MUSIC
+                    );
+
                     int result = tts.speak(
                         chunks.get(i),
                         queueMode,
-                        null,
+                        speechParams,
                         utteranceId
                     );
 
