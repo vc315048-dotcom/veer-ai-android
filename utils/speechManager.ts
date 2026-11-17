@@ -592,24 +592,37 @@ class SpeechManager {
         // producing this answer. Do not mark TTS successful merely because a
         // request was submitted to the native plugin.
         let nativeStarted = false;
+        let resolveStarted!: () => void;
+        let rejectStarted!: (error: any) => void;
+        const startedPromise = new Promise<void>((resolve, reject) => {
+          resolveStarted = resolve;
+          rejectStarted = reject;
+        });
         const startListener = await nativeTTS.addListener('speechStarted', () => {
           if (nativeStarted || this.currentSpeechId !== speechId) return;
           nativeStarted = true;
           this.isCurrentlySpeaking = true;
           onStatusUpdate?.('वीर बोल रहा है (Android हिन्दी आवाज़)');
           onStart?.();
+          resolveStarted();
         });
 
         try {
-          let startTimeout: any;
           const speakPromise = nativeTTS.speak({
             text: cleanText,
             rate: settings.rate || 1.0,
             pitch: settings.pitch || 1.0,
           });
+          // A native failure before speechStarted must fail immediately.
+          speakPromise.catch(rejectStarted);
+
+          let startTimeout: any;
           try {
+            // Only wait up to 18 seconds for the FIRST audio-start event.
+            // The native speak promise resolves after the entire answer has
+            // finished, so it must not share this startup timeout.
             await Promise.race([
-              speakPromise,
+              startedPromise,
               new Promise<never>((_, reject) => {
                 startTimeout = setTimeout(() => {
                   reject(new Error('Android TTS ने 18 सेकंड में बोलना शुरू नहीं किया। फोन की Text-to-Speech सेटिंग में Hindi voice जाँचें।'));
@@ -619,6 +632,10 @@ class SpeechManager {
           } finally {
             if (startTimeout) clearTimeout(startTimeout);
           }
+
+          // Keep the speech session alive until Android confirms all chunks
+          // have finished; only then may the UI resume microphone listening.
+          await speakPromise;
         } finally {
           await startListener.remove().catch(() => {});
         }
