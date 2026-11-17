@@ -21,7 +21,11 @@ public class VeerNativeTTSPlugin extends Plugin {
     private static final String TAG = "VeerNativeTTS";
     private TextToSpeech tts;
     private boolean ready = false;
-    private PluginCall pendingInitCall;
+    private PluginCall pendingAvailabilityCall;
+    private PluginCall pendingSpeakCall;
+    private String pendingSpeakText;
+    private double pendingSpeakRate = 1.0;
+    private double pendingSpeakPitch = 1.0;
     private PluginCall activeSpeakCall;
     private AtomicBoolean activeFinished;
     private int speakSession = 0;
@@ -40,16 +44,26 @@ public class VeerNativeTTSPlugin extends Plugin {
                         && lang != TextToSpeech.LANG_NOT_SUPPORTED;
                 }
 
-                if (pendingInitCall != null) {
-                    PluginCall call = pendingInitCall;
-                    pendingInitCall = null;
+                JSObject result = new JSObject();
+                result.put("ready", ready);
+                result.put("language", "hi-IN");
 
-                    JSObject result = new JSObject();
-                    result.put("ready", ready);
-                    result.put("language", "hi-IN");
+                if (pendingAvailabilityCall != null) {
+                    PluginCall call = pendingAvailabilityCall;
+                    pendingAvailabilityCall = null;
+                    if (ready) call.resolve(result);
+                    else call.reject("Hindi TTS उपलब्ध नहीं है। Android में Hindi voice data डाउनलोड करें।");
+                }
 
+                if (pendingSpeakCall != null) {
+                    PluginCall call = pendingSpeakCall;
+                    String text = pendingSpeakText;
+                    double rate = pendingSpeakRate;
+                    double pitch = pendingSpeakPitch;
+                    pendingSpeakCall = null;
+                    pendingSpeakText = null;
                     if (ready) {
-                        call.resolve(result);
+                        startSpeak(call, text, rate, pitch);
                     } else {
                         call.reject("Hindi TTS उपलब्ध नहीं है। Android में Hindi voice data डाउनलोड करें।");
                     }
@@ -121,10 +135,19 @@ public class VeerNativeTTSPlugin extends Plugin {
         }
 
         if (!ready) {
-            pendingInitCall = call;
+            // TextToSpeech initialization is asynchronous. Keep the actual
+            // speech request and execute it after Hindi TTS becomes ready.
+            pendingSpeakCall = call;
+            pendingSpeakText = text;
+            pendingSpeakRate = rate;
+            pendingSpeakPitch = pitch;
             return;
         }
 
+        startSpeak(call, text, rate, pitch);
+    }
+
+    private void startSpeak(PluginCall call, String text, double rate, double pitch) {
         getActivity().runOnUiThread(() -> {
             try {
                 // पुरानी आवाज़ और पुराने अनुरोध को रोकें।
@@ -286,15 +309,40 @@ public class VeerNativeTTSPlugin extends Plugin {
 
     @PluginMethod
     public void isAvailable(PluginCall call) {
-        JSObject result = new JSObject();
-        result.put("available", ready);
-        result.put("language", "hi-IN");
-        call.resolve(result);
+        if (ready) {
+            JSObject result = new JSObject();
+            result.put("available", true);
+            result.put("language", "hi-IN");
+            call.resolve(result);
+            return;
+        }
+
+        if (tts == null) {
+            call.reject("Android TTS अभी शुरू नहीं हुआ।");
+            return;
+        }
+
+        // Wait for the asynchronous TextToSpeech initialization callback
+        // instead of reporting a temporary not-ready state as unavailable.
+        if (pendingAvailabilityCall != null) {
+            pendingAvailabilityCall.reject("TTS availability check replaced.");
+        }
+        pendingAvailabilityCall = call;
     }
 
     @Override
     protected void handleOnDestroy() {
         speakSession++;
+
+        if (pendingSpeakCall != null) {
+            pendingSpeakCall.reject("VEER बंद किया गया।");
+            pendingSpeakCall = null;
+            pendingSpeakText = null;
+        }
+        if (pendingAvailabilityCall != null) {
+            pendingAvailabilityCall.reject("VEER बंद किया गया।");
+            pendingAvailabilityCall = null;
+        }
 
         if (tts != null) {
             tts.stop();
