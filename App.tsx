@@ -293,7 +293,11 @@ export default function App() {
     (msg: ChatMessage) => {
       speechManager.unlockAudio();
       setTtsError(null);
-      handleStopPlayback();
+      // speechManager.speak() serializes and stops any previous TTS itself.
+      // Avoid a second fire-and-forget STOP here, which can race with the new
+      // Android TextToSpeech request and silence the assistant's reply.
+      cancelAutoListen();
+      setIsSpeaking(false);
       setActivePlayingId(msg.id);
       setStatusText('ऑडियो तैयार हो रहा है...');
       if (isNativeAndroid()) {
