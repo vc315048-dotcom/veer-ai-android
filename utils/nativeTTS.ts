@@ -2,6 +2,7 @@ import { Capacitor, registerPlugin } from '@capacitor/core';
 
 interface NativeTTSPlugin {
   speak(options: { text: string; rate?: number; pitch?: number }): Promise<{ utteranceId?: string }>;
+  addListener(eventName: 'speechStarted', listener: (event: { utteranceId?: string }) => void): Promise<{ remove: () => Promise<void> }>;
   stop(): Promise<void>;
   isAvailable(): Promise<{ available: boolean; language: string }>;
 }
