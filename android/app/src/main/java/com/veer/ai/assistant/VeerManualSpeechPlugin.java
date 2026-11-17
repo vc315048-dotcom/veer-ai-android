@@ -196,14 +196,30 @@ public class VeerManualSpeechPlugin extends Plugin {
                 true
             );
 
+            // Give the user enough time to finish a natural sentence.
+            intent.putExtra(
+                RecognizerIntent.EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS,
+                3500
+            );
+            intent.putExtra(
+                RecognizerIntent.EXTRA_SPEECH_INPUT_POSSIBLY_COMPLETE_SILENCE_LENGTH_MILLIS,
+                2000
+            );
+            intent.putExtra(
+                RecognizerIntent.EXTRA_SPEECH_INPUT_MINIMUM_LENGTH_MILLIS,
+                8000
+            );
+
             intent.putExtra(
                 RecognizerIntent.EXTRA_MAX_RESULTS,
                 1
             );
 
+            // Prefer online Hindi recognition when available; forcing offline
+            // can return empty results if the device has no Hindi offline model.
             intent.putExtra(
                 RecognizerIntent.EXTRA_PREFER_OFFLINE,
-                true
+                false
             );
 
             intent.putExtra(
