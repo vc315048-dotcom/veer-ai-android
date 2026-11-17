@@ -28,10 +28,10 @@ import java.util.ArrayList;
  * VeerVoiceForegroundService
  *
  * Native Android Foreground Service for VEER Personal AI Superhero Assistant.
- * Keeps microphone listening active even when phone screen is turned off or app is backgrounded.
+ * Keeps microphone listening active while the service is allowed to run.
  *
- * Complies with Android 14+ (API 34) Foreground Service type: microphone rules.
- * Displays persistent ongoing notification with direct "सुनना बंद करें" (Stop Listening) action.
+ * Android microphone foreground-service permissions and background-start
+ * restrictions still apply. The user must start this service while permitted.
  */
 public class VeerVoiceForegroundService extends Service {
     private static final String TAG = "VeerVoiceService";
@@ -53,7 +53,8 @@ public class VeerVoiceForegroundService extends Service {
     private Handler mainHandler;
     private Runnable restartListeningRunnable;
     private boolean isListeningActive = false;
-private boolean awaitingWakeCommand = false;
+    private boolean awaitingWakeCommand = false;
+
     public interface VoiceServiceListener {
         void onSpeechResult(String text);
         void onPartialResult(String text);
@@ -131,7 +132,6 @@ private boolean awaitingWakeCommand = false;
     }
 
     private Notification buildPersistentNotification() {
-        // Stop action intent when user presses "सुनना बंद करें" in notification tray
         Intent stopIntent = new Intent(this, VeerVoiceForegroundService.class);
         stopIntent.setAction(ACTION_STOP);
         int pendingIntentFlags = PendingIntent.FLAG_UPDATE_CURRENT;
@@ -140,7 +140,6 @@ private boolean awaitingWakeCommand = false;
         }
         PendingIntent stopPendingIntent = PendingIntent.getService(this, 1, stopIntent, pendingIntentFlags);
 
-        // Tap notification to open or bring Veer app to foreground
         Intent openAppIntent = new Intent(this, MainActivity.class);
         openAppIntent.setFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP | Intent.FLAG_ACTIVITY_CLEAR_TOP);
         PendingIntent openPendingIntent = PendingIntent.getActivity(this, 0, openAppIntent, pendingIntentFlags);
@@ -166,8 +165,8 @@ private boolean awaitingWakeCommand = false;
 
         isServiceRunning = true;
         isPaused = false;
+        awaitingWakeCommand = false;
 
-        // 1. Start as Foreground Service with Microphone type (Android 14+ requirement)
         Notification notification = buildPersistentNotification();
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             startForeground(NOTIFICATION_ID, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE);
@@ -175,7 +174,6 @@ private boolean awaitingWakeCommand = false;
             startForeground(NOTIFICATION_ID, notification);
         }
 
-        // 2. Acquire Partial WakeLock so CPU doesn't sleep when screen turns off
         try {
             if (wakeLock == null) {
                 PowerManager powerManager = (PowerManager) getSystemService(Context.POWER_SERVICE);
@@ -185,7 +183,6 @@ private boolean awaitingWakeCommand = false;
                             "Veer:ContinuousListeningWakeLock"
                     );
                     wakeLock.setReferenceCounted(false);
-                    // 12 hours safety timeout
                     wakeLock.acquire(12 * 60 * 60 * 1000L);
                 }
             }
@@ -193,7 +190,6 @@ private boolean awaitingWakeCommand = false;
             Log.e(TAG, "Failed to acquire WakeLock: " + e.getMessage());
         }
 
-        // 3. Start native Hindi Speech Recognition
         mainHandler.post(this::initAndStartSpeechRecognizer);
 
         if (serviceListener != null) {
@@ -208,8 +204,12 @@ private boolean awaitingWakeCommand = false;
             if (speechRecognizer == null) {
                 if (!SpeechRecognizer.isRecognitionAvailable(this)) {
                     Log.e(TAG, "Speech recognition is not available on this device");
+                    if (serviceListener != null) {
+                        serviceListener.onStatusChanged("इस फोन में Speech Recognition उपलब्ध नहीं है");
+                    }
                     return;
                 }
+
                 speechRecognizer = SpeechRecognizer.createSpeechRecognizer(this);
                 speechRecognizer.setRecognitionListener(new RecognitionListener() {
                     @Override
@@ -224,10 +224,10 @@ private boolean awaitingWakeCommand = false;
                     }
 
                     @Override
-                    public void onRmsChanged(float rmsdB) {}
+                    public void onRmsChanged(float rmsdB) { }
 
                     @Override
-                    public void onBufferReceived(byte[] buffer) {}
+                    public void onBufferReceived(byte[] buffer) { }
 
                     @Override
                     public void onEndOfSpeech() {
@@ -242,87 +242,77 @@ private boolean awaitingWakeCommand = false;
 
                         if (!isServiceRunning || isPaused) return;
 
-                        // Errors like no match, speech timeout, or network retry
                         if (error == SpeechRecognizer.ERROR_NO_MATCH ||
-                            error == SpeechRecognizer.ERROR_SPEECH_TIMEOUT) {
+                                error == SpeechRecognizer.ERROR_SPEECH_TIMEOUT) {
                             scheduleRestartListening(400);
                         } else if (error == SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS) {
                             stopContinuousListening("माइक्रोफ़ोन अनुमति नहीं है");
                         } else {
-                            // Transient error: retry with brief backoff
                             scheduleRestartListening(1000);
-                            
+                        }
+                    }
 
-@Override
-public void onResults(Bundle results) {
-    isListeningActive = false;
+                    @Override
+                    public void onResults(Bundle results) {
+                        isListeningActive = false;
 
-    ArrayList<String> matches = results.getStringArrayList(
-            SpeechRecognizer.RESULTS_RECOGNITION);
+                        ArrayList<String> matches = results.getStringArrayList(
+                                SpeechRecognizer.RESULTS_RECOGNITION);
+                        String spokenText = (matches != null && !matches.isEmpty())
+                                ? matches.get(0) : null;
 
-    String spokenText = (matches != null && !matches.isEmpty())
-            ? matches.get(0) : null;
+                        if (spokenText == null || spokenText.trim().isEmpty()) {
+                            if (isServiceRunning && !isPaused) {
+                                scheduleRestartListening(450);
+                            }
+                            return;
+                        }
 
-    if (spokenText == null || spokenText.trim().isEmpty()) {
-        if (isServiceRunning && !isPaused) {
-            scheduleRestartListening(450);
-        }
-        return;
-    }
+                        String commandText;
+                        if (awaitingWakeCommand) {
+                            commandText = spokenText.trim();
+                            awaitingWakeCommand = false;
+                        } else {
+                            String normalized = spokenText.trim().toLowerCase(java.util.Locale.ROOT);
+                            java.util.regex.Matcher wakeMatcher = java.util.regex.Pattern
+                                    .compile("(वीर\\s*सुनो?|veer\\s*suno?)",
+                                            java.util.regex.Pattern.CASE_INSENSITIVE)
+                                    .matcher(normalized);
 
-    String commandText;
+                            if (!wakeMatcher.find()) {
+                                Log.d(TAG, "Ignored speech without VEER wake word");
+                                if (isServiceRunning && !isPaused) {
+                                    scheduleRestartListening(450);
+                                }
+                                return;
+                            }
 
-    if (awaitingWakeCommand) {
-        commandText = spokenText.trim();
-        awaitingWakeCommand = false;
-    } else {
-        String normalized = spokenText.trim().toLowerCase(
-                java.util.Locale.ROOT);
+                            commandText = spokenText.substring(wakeMatcher.end()).trim();
+                            commandText = commandText.replaceFirst("^[\\s,，:;.!?।-]+", "").trim();
 
-        java.util.regex.Matcher wakeMatcher =
-                java.util.regex.Pattern.compile(
-                        "(वीर\\s*सुनो?|veer\\s*suno?)",
-                        java.util.regex.Pattern.CASE_INSENSITIVE)
-                .matcher(normalized);
+                            if (commandText.isEmpty()) {
+                                awaitingWakeCommand = true;
+                                if (serviceListener != null) {
+                                    serviceListener.onStatusChanged("जी, बोलिए। वीर सुन रहा है...");
+                                }
+                                if (isServiceRunning && !isPaused) {
+                                    scheduleRestartListening(350);
+                                }
+                                return;
+                            }
+                        }
 
-        if (!wakeMatcher.find()) {
-            Log.d(TAG, "Ignored speech without VEER wake word");
-            if (isServiceRunning && !isPaused) {
-                scheduleRestartListening(450);
-            }
-            return;
-        }
-
-        commandText = spokenText.substring(wakeMatcher.end()).trim();
-        commandText = commandText.replaceFirst(
-                "^[\\s,，:;.!?।-]+", "").trim();
-
-        if (commandText.isEmpty()) {
-            awaitingWakeCommand = true;
-
-            if (serviceListener != null) {
-                serviceListener.onStatusChanged(
-                        "जी, बोलिए। वीर सुन रहा है...");
-            }
-
-            if (isServiceRunning && !isPaused) {
-                scheduleRestartListening(350);
-            }
-            return;
-        }
-    }
-
-    Log.d(TAG, "VEER wake word accepted");
-    pauseRecognition();
-
-    if (serviceListener != null) {
-        serviceListener.onSpeechResult(commandText);
-    }
-}
+                        Log.d(TAG, "VEER wake word accepted");
+                        pauseRecognition();
+                        if (serviceListener != null) {
+                            serviceListener.onSpeechResult(commandText);
+                        }
+                    }
 
                     @Override
                     public void onPartialResults(Bundle partialResults) {
-                        ArrayList<String> partials = partialResults.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION);
+                        ArrayList<String> partials = partialResults.getStringArrayList(
+                                SpeechRecognizer.RESULTS_RECOGNITION);
                         if (partials != null && !partials.isEmpty()) {
                             String text = partials.get(0);
                             if (text != null && !text.trim().isEmpty() && serviceListener != null) {
@@ -332,12 +322,13 @@ public void onResults(Bundle results) {
                     }
 
                     @Override
-                    public void onEvent(int eventType, Bundle params) {}
+                    public void onEvent(int eventType, Bundle params) { }
                 });
             }
 
             Intent recognizerIntent = new Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH);
-            recognizerIntent.putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM);
+            recognizerIntent.putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL,
+                    RecognizerIntent.LANGUAGE_MODEL_FREE_FORM);
             recognizerIntent.putExtra(RecognizerIntent.EXTRA_LANGUAGE, "hi-IN");
             recognizerIntent.putExtra(RecognizerIntent.EXTRA_LANGUAGE_PREFERENCE, "hi-IN");
             recognizerIntent.putExtra(RecognizerIntent.EXTRA_ONLY_RETURN_LANGUAGE_PREFERENCE, "hi-IN");
@@ -401,6 +392,7 @@ public void onResults(Bundle results) {
         isServiceRunning = false;
         isPaused = false;
         isListeningActive = false;
+        awaitingWakeCommand = false;
 
         if (restartListeningRunnable != null) {
             mainHandler.removeCallbacks(restartListeningRunnable);
@@ -419,7 +411,6 @@ public void onResults(Bundle results) {
             }
         });
 
-        // Release WakeLock safely
         try {
             if (wakeLock != null && wakeLock.isHeld()) {
                 wakeLock.release();
@@ -429,7 +420,6 @@ public void onResults(Bundle results) {
             Log.w(TAG, "Error releasing wakeLock: " + e.getMessage());
         }
 
-        // Remove foreground notification and stop service
         try {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
                 stopForeground(STOP_FOREGROUND_REMOVE);
