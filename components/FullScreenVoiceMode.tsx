@@ -692,12 +692,13 @@ export const FullScreenVoiceMode: React.FC<FullScreenVoiceModeProps> = ({
     }
 
     soundFx.playTap();
+    // Voice Mode may already have started listening automatically.
+    // A tap on the orb while recognition is active must NOT cancel the user's
+    // speaking window; leave the microphone open so they can finish speaking.
     if (isActivelyListeningRef.current || isListening || isStartingRef.current) {
-      stopListening();
-      onListeningStateChange?.('सुनना रोका गया (ओर्ब दबाकर फिर बोलें)');
-    } else {
-      startListening(true);
+      return;
     }
+    startListening(true);
   };
 
   // Requirement 9 & 10: X button immediately halts all sessions, auto-restarts, and returns to Chat Box
