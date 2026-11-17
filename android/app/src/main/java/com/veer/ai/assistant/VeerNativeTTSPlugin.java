@@ -21,6 +21,7 @@ public class VeerNativeTTSPlugin extends Plugin {
     private static final String TAG = "VeerNativeTTS";
     private TextToSpeech tts;
     private boolean ready = false;
+    private boolean initializationFinished = false;
     private PluginCall pendingAvailabilityCall;
     private PluginCall pendingSpeakCall;
     private String pendingSpeakText;
@@ -37,6 +38,7 @@ public class VeerNativeTTSPlugin extends Plugin {
             getContext().getApplicationContext(),
             status -> {
                 ready = status == TextToSpeech.SUCCESS;
+                initializationFinished = true;
 
                 if (ready) {
                     int lang = tts.setLanguage(new Locale("hi", "IN"));
@@ -135,6 +137,10 @@ public class VeerNativeTTSPlugin extends Plugin {
         }
 
         if (!ready) {
+            if (initializationFinished) {
+                call.reject("Hindi TTS उपलब्ध नहीं है। Android में Hindi voice data डाउनलोड करें।");
+                return;
+            }
             // TextToSpeech initialization is asynchronous. Keep the actual
             // speech request and execute it after Hindi TTS becomes ready.
             pendingSpeakCall = call;
