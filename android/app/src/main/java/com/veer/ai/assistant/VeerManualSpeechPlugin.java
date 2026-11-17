@@ -43,6 +43,11 @@ public class VeerManualSpeechPlugin extends Plugin {
 
     @PluginMethod
     public void startListening(PluginCall call) {
+        // Android SpeechRecognizer must be created and controlled on the main thread.
+        getActivity().runOnUiThread(() -> startListeningOnMainThread(call));
+    }
+
+    private void startListeningOnMainThread(PluginCall call) {
         if (listening) {
             call.reject("माइक्रोफ़ोन पहले से चालू है।");
             return;
@@ -63,6 +68,10 @@ public class VeerManualSpeechPlugin extends Plugin {
 
     @PermissionCallback
     private void microphonePermissionCallback(PluginCall call) {
+        getActivity().runOnUiThread(() -> handleMicrophonePermissionResult(call));
+    }
+
+    private void handleMicrophonePermissionResult(PluginCall call) {
         if (getPermissionState("microphone")
             == com.getcapacitor.PermissionState.GRANTED) {
             startRecognition(call);
@@ -286,6 +295,10 @@ public class VeerManualSpeechPlugin extends Plugin {
 
     @PluginMethod
     public void stopListening(PluginCall call) {
+        getActivity().runOnUiThread(() -> stopListeningOnMainThread(call));
+    }
+
+    private void stopListeningOnMainThread(PluginCall call) {
         try {
             if (speechRecognizer != null && listening) {
                 speechRecognizer.stopListening();
@@ -303,6 +316,10 @@ public class VeerManualSpeechPlugin extends Plugin {
 
     @PluginMethod
     public void cancelListening(PluginCall call) {
+        getActivity().runOnUiThread(() -> cancelListeningOnMainThread(call));
+    }
+
+    private void cancelListeningOnMainThread(PluginCall call) {
         listening = false;
 
         PluginCall oldCall = pendingCall;
