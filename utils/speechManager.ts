@@ -588,10 +588,45 @@ class SpeechManager {
         const availability = await nativeTTS.isAvailable();
         if (!availability.available) throw new Error('Android Hindi TTS अभी उपलब्ध नहीं है। Speech Services में Hindi voice data जाँचें।');
         if (this.currentSpeechId !== speechId) return;
-        this.isCurrentlySpeaking = true;
-        onStart?.();
-        await nativeTTS.speak({ text: cleanText, rate: settings.rate || 1.0, pitch: settings.pitch || 1.0 });
+        // Android reports speechStarted only when TextToSpeech actually begins
+        // producing this answer. Do not mark TTS successful merely because a
+        // request was submitted to the native plugin.
+        let nativeStarted = false;
+        const startListener = await nativeTTS.addListener('speechStarted', () => {
+          if (nativeStarted || this.currentSpeechId !== speechId) return;
+          nativeStarted = true;
+          this.isCurrentlySpeaking = true;
+          onStatusUpdate?.('वीर बोल रहा है (Android हिन्दी आवाज़)');
+          onStart?.();
+        });
+
+        try {
+          let startTimeout: any;
+          const speakPromise = nativeTTS.speak({
+            text: cleanText,
+            rate: settings.rate || 1.0,
+            pitch: settings.pitch || 1.0,
+          });
+          try {
+            await Promise.race([
+              speakPromise,
+              new Promise<never>((_, reject) => {
+                startTimeout = setTimeout(() => {
+                  reject(new Error('Android TTS ने 18 सेकंड में बोलना शुरू नहीं किया। फोन की Text-to-Speech सेटिंग में Hindi voice जाँचें।'));
+                }, 18000);
+              }),
+            ]);
+          } finally {
+            if (startTimeout) clearTimeout(startTimeout);
+          }
+        } finally {
+          await startListener.remove().catch(() => {});
+        }
+
         if (this.currentSpeechId === speechId) {
+          if (!nativeStarted) {
+            throw new Error('Android TTS ने आवाज़ शुरू होने का संकेत नहीं दिया।');
+          }
           onStatusUpdate?.('वीर बोल चुका है');
           safeEnd();
         }
