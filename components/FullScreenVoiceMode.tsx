@@ -341,10 +341,15 @@ export const FullScreenVoiceMode: React.FC<FullScreenVoiceModeProps> = ({
           await partialListener.remove();
           manualSpeechPartialListenerRef.current = null;
 
-          if (result?.text?.trim()) {
-            commitSpeechAndSend(result.text.trim());
+          // Some Android recognizers deliver useful partial text but return an
+          // empty final result. Never throw away the words already shown to the user.
+          const recognizedText =
+            result?.text?.trim() || latestTranscriptRef.current.trim();
+
+          if (recognizedText) {
+            commitSpeechAndSend(recognizedText);
           } else {
-            showTemporaryError('आवाज़ समझ में नहीं आई। दोबारा बोलें।');
+            showTemporaryError('आवाज़ पूरी तरह समझ नहीं आई। कृपया दोबारा बोलें।');
             if (continuousModeRef.current) {
               await nativeVoiceService.resumeListening();
             }
@@ -354,9 +359,17 @@ export const FullScreenVoiceMode: React.FC<FullScreenVoiceModeProps> = ({
             manualSpeechActiveRef.current = false;
             isActivelyListeningRef.current = false;
             setIsListening(false);
-            showTemporaryError(error?.message || 'माइक शुरू नहीं हो सका।');
-            if (continuousModeRef.current) {
-              await nativeVoiceService.resumeListening();
+
+            // If Android fails after producing a partial transcript, send that
+            // transcript instead of reverting to the previous question.
+            const partialText = latestTranscriptRef.current.trim();
+            if (partialText) {
+              commitSpeechAndSend(partialText);
+            } else {
+              showTemporaryError(error?.message || 'माइक शुरू नहीं हो सका।');
+              if (continuousModeRef.current) {
+                await nativeVoiceService.resumeListening();
+              }
             }
           }
 
