@@ -10,7 +10,7 @@ const KNOWN_API_ORIGIN =
 
 const configuredOrigin = (import.meta.env.VITE_API_BASE_URL || '').trim();
 
-const apiOrigin = (configuredOrigin || KNOWN_API_ORIGIN).replace(/\\/+$/, '');
+const apiOrigin = (configuredOrigin || KNOWN_API_ORIGIN).replace(/\/+$/, '');
 
 export function apiUrl(path: string): string {
   const normalizedPath = path.startsWith('/') ? path : `/${path}`;
