@@ -80,14 +80,14 @@ export class VeerLiveVoice {
           window.clearTimeout(timeout);
           socket.send(JSON.stringify({ setup: {
             model: 'models/' + MODEL,
-            generationConfig: {
-              responseModalities: ['AUDIO'],
-              speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: 'Kore' } } },
+            generation_config: {
+              response_modalities: ['AUDIO'],
+              speech_config: { voice_config: { prebuilt_voice_config: { voice_name: 'Kore' } } },
             },
-            inputAudioTranscription: {},
-            outputAudioTranscription: {},
-            realtimeInputConfig: { automaticActivityDetection: { disabled: false, silenceDurationMs: 1200 } },
-            systemInstruction: { parts: [{ text: 'आप वीर हैं। उपयोगकर्ता से स्वाभाविक, दोस्ताना और स्पष्ट हिन्दी में बात करें। उत्तर बोलचाल के हों और सामान्यतः छोटे रखें। उपयोगकर्ता बोलना शुरू करे तो अपनी आवाज़ तुरंत रोकें और उसे सुनें।' }] },
+            input_audio_transcription: {},
+            output_audio_transcription: {},
+            realtime_input_config: { automatic_activity_detection: { disabled: false, silence_duration_ms: 1200 } },
+            system_instruction: { parts: [{ text: 'आप वीर हैं। उपयोगकर्ता से स्वाभाविक, दोस्ताना और स्पष्ट हिन्दी में बात करें। उत्तर बोलचाल के हों और सामान्यतः छोटे रखें। उपयोगकर्ता बोलना शुरू करे तो अपनी आवाज़ तुरंत रोकें और उसे सुनें।' }] },
           } }));
         };
         socket.onmessage = (event) => {
@@ -120,8 +120,8 @@ export class VeerLiveVoice {
         silentOutput.fill(0);
         if (this.stopped || !this.setupReady || this.socket?.readyState !== WebSocket.OPEN) return;
         const pcm = resampleTo16k(event.inputBuffer.getChannelData(0), this.audioContext?.sampleRate || 48000);
-        this.socket.send(JSON.stringify({ realtimeInput: { audio: {
-          mimeType: 'audio/pcm;rate=16000', data: floatToPcm16Base64(pcm),
+        this.socket.send(JSON.stringify({ realtime_input: { audio: {
+          mime_type: 'audio/pcm;rate=16000', data: floatToPcm16Base64(pcm),
         } } }));
       };
       this.source.connect(this.processor);
