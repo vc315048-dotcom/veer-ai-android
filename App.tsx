@@ -177,13 +177,17 @@ export default function App() {
     cancelAutoListen();
     if (!continuousModeEnabledRef.current || !isVoiceModeOpenRef.current) return;
 
-    // 450ms safety buffer to ensure audio playback is completely silent before opening mic
+    // Give the user a full 3 seconds after VEER finishes speaking before reopening the microphone.
+    // On Android, the foreground service owns the microphone in continuous mode.
     autoListenTimerRef.current = setTimeout(() => {
       autoListenTimerRef.current = null;
       if (continuousModeEnabledRef.current && isVoiceModeOpenRef.current) {
+        if (isNativeAndroid()) {
+          void nativeVoiceService.resumeListening();
+        }
         setAutoListenTrigger((prev) => prev + 1);
       }
-    }, 450);
+    }, 3000);
   }, [cancelAutoListen]);
 
   // Explicit handler when Close (X) is clicked in Voice Mode
@@ -224,13 +228,11 @@ export default function App() {
     setActivePlayingId(null);
     if (continuousModeEnabledRef.current) {
       setStatusText('अब बोलिए');
-      if (isNativeAndroid()) {
-        nativeVoiceService.resumeListening();
-      }
+      scheduleAutoListen();
     } else {
       setStatusText('लगातार सुनना बंद है (माइक दबाकर बोलें)');
     }
-  }, [cancelAutoListen]);
+  }, [cancelAutoListen, scheduleAutoListen]);
 
   // Reliable ON/OFF toggle: turns OFF immediately and stays OFF until turned ON again
   const handleToggleContinuousMode = useCallback(
@@ -322,9 +324,6 @@ export default function App() {
           if (continuousModeEnabledRef.current) {
             setStatusText('वीर सुन रहा है... अब बोलिए');
             scheduleAutoListen();
-            if (isNativeAndroid()) {
-              nativeVoiceService.resumeListening();
-            }
           } else {
             setStatusText('लगातार सुनना बंद है (माइक दबाकर बोलें)');
           }
@@ -338,9 +337,6 @@ export default function App() {
           if (continuousModeEnabledRef.current) {
             setStatusText('अब बोलिए');
             scheduleAutoListen();
-            if (isNativeAndroid()) {
-              nativeVoiceService.resumeListening();
-            }
           } else {
             setStatusText('लगातार सुनना बंद है (माइक दबाकर बोलें)');
           }
@@ -528,8 +524,8 @@ export default function App() {
             ? 'अब बोलिए'
             : 'लगातार सुनना बंद है (माइक दबाकर बोलें)'
         );
-        if (continuousModeEnabledRef.current && isNativeAndroid()) {
-          nativeVoiceService.resumeListening();
+        if (continuousModeEnabledRef.current) {
+          scheduleAutoListen();
         }
         return;
       }
@@ -561,9 +557,6 @@ export default function App() {
         if (continuousModeEnabledRef.current) {
           setStatusText('अब बोलिए');
           scheduleAutoListen();
-          if (isNativeAndroid()) {
-            nativeVoiceService.resumeListening();
-          }
         } else {
           setStatusText('लगातार सुनना बंद है (माइक दबाकर बोलें)');
         }
@@ -606,8 +599,8 @@ export default function App() {
           ? 'अब बोलिए'
           : 'लगातार सुनना बंद है (माइक दबाकर बोलें)'
       );
-      if (continuousModeEnabledRef.current && isNativeAndroid()) {
-        nativeVoiceService.resumeListening();
+      if (continuousModeEnabledRef.current) {
+        scheduleAutoListen();
       }
     } finally {
       setIsLoading(false);
