@@ -22,6 +22,9 @@ import java.util.concurrent.atomic.AtomicBoolean;
 public class VeerNativeTTSPlugin extends Plugin {
     private static final String TAG = "VeerNativeTTS";
     private TextToSpeech tts;
+    private AudioManager audioManager;
+    private android.media.AudioFocusRequest audioFocusRequest;
+    private boolean hasAudioFocus = false;
     private boolean ready = false;
     private boolean initializationFinished = false;
     private PluginCall pendingAvailabilityCall;
@@ -36,6 +39,7 @@ public class VeerNativeTTSPlugin extends Plugin {
     @Override
     public void load() {
         super.load();
+        audioManager = (AudioManager) getContext().getSystemService(android.content.Context.AUDIO_SERVICE);
         tts = new TextToSpeech(
             getContext().getApplicationContext(),
             status -> {
@@ -155,6 +159,49 @@ public class VeerNativeTTSPlugin extends Plugin {
         startSpeak(call, text, rate, pitch);
     }
 
+
+    private boolean requestSpeechAudioFocus() {
+        if (audioManager == null) return false;
+        try {
+            AudioAttributes attributes = new AudioAttributes.Builder()
+                .setUsage(AudioAttributes.USAGE_MEDIA)
+                .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
+                .build();
+            int result;
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+                audioFocusRequest = new android.media.AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN_TRANSIENT)
+                    .setAudioAttributes(attributes)
+                    .setAcceptsDelayedFocusGain(false)
+                    .setOnAudioFocusChangeListener(change -> { })
+                    .build();
+                result = audioManager.requestAudioFocus(audioFocusRequest);
+            } else {
+                result = audioManager.requestAudioFocus(null, AudioManager.STREAM_MUSIC, AudioManager.AUDIOFOCUS_GAIN_TRANSIENT);
+            }
+            hasAudioFocus = result == AudioManager.AUDIOFOCUS_REQUEST_GRANTED;
+            return hasAudioFocus;
+        } catch (Exception e) {
+            Log.e(TAG, "Audio focus request failed", e);
+            return false;
+        }
+    }
+
+    private void abandonSpeechAudioFocus() {
+        if (!hasAudioFocus || audioManager == null) return;
+        try {
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O && audioFocusRequest != null) {
+                audioManager.abandonAudioFocusRequest(audioFocusRequest);
+            } else {
+                audioManager.abandonAudioFocus(null);
+            }
+        } catch (Exception e) {
+            Log.w(TAG, "Audio focus release failed", e);
+        } finally {
+            hasAudioFocus = false;
+            audioFocusRequest = null;
+        }
+    }
+
     private void startSpeak(PluginCall call, String text, double rate, double pitch) {
         getActivity().runOnUiThread(() -> {
             try {
@@ -165,6 +212,11 @@ public class VeerNativeTTSPlugin extends Plugin {
                 }
 
                 tts.stop();
+                abandonSpeechAudioFocus();
+                if (!requestSpeechAudioFocus()) {
+                    call.reject("Android ने आवाज़ के लिए ऑडियो फ़ोकस नहीं दिया। मीडिया वॉल्यूम और दूसरे ऑडियो ऐप जाँचें।");
+                    return;
+                }
 
                 final int thisSession = ++speakSession;
                 final AtomicBoolean finished = new AtomicBoolean(false);
@@ -230,6 +282,7 @@ public class VeerNativeTTSPlugin extends Plugin {
 
                                 activeSpeakCall = null;
                                 activeFinished = null;
+                                abandonSpeechAudioFocus();
                             }
                         }
 
@@ -252,6 +305,7 @@ public class VeerNativeTTSPlugin extends Plugin {
                                 call.reject(message);
                                 activeSpeakCall = null;
                                 activeFinished = null;
+                                abandonSpeechAudioFocus();
                             }
                         }
                     }
@@ -290,6 +344,7 @@ public class VeerNativeTTSPlugin extends Plugin {
                         if (finished.compareAndSet(false, true)) {
                             activeSpeakCall = null;
                             activeFinished = null;
+                            abandonSpeechAudioFocus();
                             call.reject("Android TTS ने बोलना शुरू नहीं किया।");
                         }
                         tts.stop();
@@ -308,6 +363,7 @@ public class VeerNativeTTSPlugin extends Plugin {
         getActivity().runOnUiThread(() -> {
             try {
                 speakSession++;
+                abandonSpeechAudioFocus();
 
                 if (activeSpeakCall != null && activeFinished != null
                     && activeFinished.compareAndSet(false, true)) {
