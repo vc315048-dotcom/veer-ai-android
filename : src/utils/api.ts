@@ -2,12 +2,11 @@ import { Capacitor } from '@capacitor/core';
 
 /**
  * API routing for VEER.
- * Web builds use the same-origin Express server. Android builds use the known
- * Cloud Run API origin unless VITE_API_BASE_URL overrides it at build time.
+ * Web builds use the same-origin Express server. Android builds use the
+ * deployed VEER backend so API calls do not hit the local WebView asset server.
  * Never put a Gemini API key in this client-side file.
  */
-const KNOWN_ANDROID_API_ORIGIN =
-  https://veer-personal-ai-superhero-assistant.ai.studio
+const KNOWN_ANDROID_API_ORIGIN = 'https://veerhero-assistant.ai.studio';
 
 const configuredOrigin = (import.meta.env.VITE_API_BASE_URL || '').trim();
 const isNativeAndroid =
