@@ -260,12 +260,7 @@ app.post('/api/live-token', async (req, res) => {
             speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: 'Kore' } } },
             inputAudioTranscription: {},
             outputAudioTranscription: {},
-            realtimeInputConfig: { automaticActivityDetection: { disabled: false, silenceDurationMs: 1200 } },
-            systemInstruction: {
-              parts: [{
-                text: VEER_SYSTEM_INSTRUCTION + '\\n\\nआप एक स्वाभाविक हिंदी बोलने वाले साथी हैं। छोटे, बातचीत जैसे जवाब दें। उपयोगकर्ता के बोलना पूरा होने पर जवाब दें। उपयोगकर्ता बीच में बोले तो अपनी आवाज़ रोककर उसे सुनें।'
-              }]
-            }
+            realtimeInputConfig: { automaticActivityDetection: { disabled: false, silenceDurationMs: 1200 } }
           }
         }
       }
