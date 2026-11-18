@@ -82,7 +82,7 @@ export class VeerLiveVoice {
             model: 'models/' + MODEL,
             generationConfig: {
               responseModalities: ['AUDIO'],
-              speechConfig: { voiceConfig: { prebuilt_voiceConfig: { voiceName: 'Kore' } } },
+              speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: 'Kore' } } },
             },
             inputAudioTranscription: {},
             outputAudioTranscription: {},
