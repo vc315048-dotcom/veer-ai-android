@@ -786,7 +786,7 @@ export const FullScreenVoiceMode: React.FC<FullScreenVoiceModeProps> = ({
             type="button"
             onClick={handlePillOrbClick}
             disabled={isLoading}
-            className="flex-1 h-[64px] rounded-full bg-white/20 border border-white/25 backdrop-blur-2xl flex items-center px-5 text-white shadow-[0_8px_35px_rgba(0,0,0,0.45)] active:scale-[0.99] disabled:opacity-60"
+            className="flex-1 h-[64px] rounded-full bg-white/20 border border-white/25 backdrop-blur-2xl flex items-center px-5 text-white shadow-[0_8px_35px_rgba(0,0,0,0.45)] outline-none focus:outline-none focus-visible:outline-none ring-0 focus:ring-0 active:scale-[0.99] disabled:opacity-60"
             aria-label={isListening ? 'वीर सुन रहा है' : 'बोलने के लिए दबाएँ'}
           >
             <span className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 via-cyan-400 to-blue-700 shadow-[0_0_24px_rgba(0,190,255,0.7)] flex items-center justify-center shrink-0">
