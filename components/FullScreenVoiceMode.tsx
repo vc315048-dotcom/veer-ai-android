@@ -745,7 +745,7 @@ export const FullScreenVoiceMode: React.FC<FullScreenVoiceModeProps> = ({
       <div className="absolute inset-0 pointer-events-none bg-black">
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_rgba(18,45,105,0.18)_0%,_transparent_62%)]" />
         <div
-          className={`absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[min(56vw,370px)] h-[min(56vw,370px)] rounded-full transition-all duration-700 ${
+          className={`absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[min(38vw,250px)] h-[min(38vw,250px)] rounded-full transition-all duration-700 ${
             isSpeaking
               ? 'scale-110 shadow-[0_0_110px_rgba(90,145,255,0.55)]'
               : isListening
@@ -786,10 +786,10 @@ export const FullScreenVoiceMode: React.FC<FullScreenVoiceModeProps> = ({
             type="button"
             onClick={handlePillOrbClick}
             disabled={isLoading}
-            className="flex-1 h-[76px] rounded-full bg-white/20 border border-white/25 backdrop-blur-2xl flex items-center px-5 text-white shadow-[0_8px_35px_rgba(0,0,0,0.45)] active:scale-[0.99] disabled:opacity-60"
+            className="flex-1 h-[64px] rounded-full bg-white/20 border border-white/25 backdrop-blur-2xl flex items-center px-5 text-white shadow-[0_8px_35px_rgba(0,0,0,0.45)] active:scale-[0.99] disabled:opacity-60"
             aria-label={isListening ? 'वीर सुन रहा है' : 'बोलने के लिए दबाएँ'}
           >
-            <span className="w-12 h-12 rounded-full bg-gradient-to-br from-blue-500 via-cyan-400 to-blue-700 shadow-[0_0_24px_rgba(0,190,255,0.7)] flex items-center justify-center shrink-0">
+            <span className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 via-cyan-400 to-blue-700 shadow-[0_0_24px_rgba(0,190,255,0.7)] flex items-center justify-center shrink-0">
               {isListening ? (
                 <span className="flex items-center gap-1 h-6">
                   {audioLevel.map((height, i) => (
@@ -812,11 +812,11 @@ export const FullScreenVoiceMode: React.FC<FullScreenVoiceModeProps> = ({
           <button
             type="button"
             onClick={handleCloseVoiceMode}
-            className="w-[76px] h-[76px] rounded-full bg-white text-black flex items-center justify-center shadow-lg active:scale-95 shrink-0"
+            className="w-[60px] h-[60px] rounded-full bg-white text-black flex items-center justify-center shadow-lg active:scale-95 shrink-0"
             aria-label="Voice Mode बंद करें"
             title="बंद करें"
           >
-            <X className="w-8 h-8" />
+            <X className="w-6 h-6" />
           </button>
         </div>
       </footer>
