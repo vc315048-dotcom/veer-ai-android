@@ -743,11 +743,22 @@ export const FullScreenVoiceMode: React.FC<FullScreenVoiceModeProps> = ({
   const activePromptText = liveUserPrompt || lastUserPrompt || '';
 
   return (
-    <div className="absolute inset-0 z-50 bg-[#070b18] flex flex-col justify-between p-4 text-slate-100 select-none overflow-hidden animate-fadeIn">
-      {/* Dark navy background with subtle ambient radial blue glow */}
-      <div className="absolute inset-0 pointer-events-none overflow-hidden">
-        <div className="absolute -top-24 left-1/2 -translate-x-1/2 w-[480px] h-[480px] bg-gradient-to-b from-blue-700/15 via-cyan-500/10 to-transparent rounded-full blur-3xl" />
-        <div className="absolute -bottom-24 left-1/2 -translate-x-1/2 w-[480px] h-[480px] bg-gradient-to-t from-indigo-700/20 via-blue-600/10 to-transparent rounded-full blur-3xl" />
+    <div className="absolute inset-0 z-50 bg-black flex flex-col justify-between p-4 text-slate-100 select-none overflow-hidden animate-fadeIn">
+      {/* Gemini-like live voice canvas: deep black background and a soft animated voice sphere */}
+      <div className="absolute inset-0 pointer-events-none overflow-hidden bg-black">
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_rgba(24,54,125,0.16)_0%,_rgba(0,0,0,0)_58%)]" />
+        <div className={`absolute left-1/2 top-[46%] -translate-x-1/2 -translate-y-1/2 w-[min(58vw,270px)] h-[min(58vw,270px)] rounded-full transition-all duration-700 ${
+          isSpeaking
+            ? 'scale-110 shadow-[0_0_90px_rgba(70,125,255,0.42)]'
+            : isListening
+            ? 'scale-105 shadow-[0_0_75px_rgba(0,210,235,0.35)]'
+            : isLoading
+            ? 'scale-100 shadow-[0_0_65px_rgba(120,120,255,0.30)]'
+            : 'scale-100 shadow-[0_0_45px_rgba(70,115,255,0.20)]'
+        }`} style={{ background: 'linear-gradient(145deg, #2468ed 0%, #6799ff 38%, #dce8ff 58%, #a9c5ff 100%)' }}>
+          <div className="absolute inset-[5%] rounded-full bg-[radial-gradient(ellipse_at_68%_30%,_rgba(255,255,255,0.85),_rgba(255,255,255,0.08)_30%,_transparent_58%)]" />
+          <div className="absolute inset-0 rounded-full bg-[linear-gradient(155deg,transparent_35%,rgba(255,255,255,0.46)_54%,transparent_72%)]" />
+        </div>
       </div>
 
       {/* Top Header Bar */}
@@ -811,8 +822,8 @@ export const FullScreenVoiceMode: React.FC<FullScreenVoiceModeProps> = ({
         </div>
       </header>
             {/* Main Conversation Canvas (Clean, Responsive, Accurate Status) */}
-      <main className="relative z-10 flex-1 flex flex-col items-center justify-center px-3 my-auto">
-        <div className="w-full max-w-sm flex flex-col items-center justify-center space-y-4">
+      <main className="relative z-10 flex-1 flex flex-col items-center justify-center px-3 my-auto pt-4">
+        <div className="w-full max-w-sm flex flex-col items-center justify-center space-y-4 mt-[min(34vh,250px)]">
           {/* 1. Live Spoken Words (While speaking into mic) */}
           {interimTranscript && (
             <div className="w-full px-5 py-4 rounded-3xl bg-cyan-950/50 border border-cyan-500/40 text-center animate-fadeIn shadow-[0_4px_25px_rgba(6,182,212,0.15)] backdrop-blur-md">
@@ -994,16 +1005,14 @@ export const FullScreenVoiceMode: React.FC<FullScreenVoiceModeProps> = ({
         </div>
       </main>
 
-      {/* COMPACT HORIZONTAL FLOATING VOICE PANEL (Near Bottom Center - Exactly Preserved) */}
+      {/* Gemini-like bottom voice control bar */}
       <footer className="relative z-10 w-full flex justify-center pb-5 sm:pb-7 px-3">
-        <div
-          className="w-full max-w-[320px] sm:max-w-[350px] rounded-full p-2 bg-gradient-to-r from-[#0d1530] via-[#151c46] to-[#1c153b] border border-blue-500/30 shadow-[0_12px_36px_rgba(15,23,65,0.7),0_0_24px_rgba(6,182,212,0.22)] flex items-center justify-between gap-3 backdrop-blur-xl"
-        >
+        <div className="w-full max-w-[420px] rounded-full p-2 bg-white/15 border border-white/20 shadow-[0_8px_35px_rgba(0,0,0,0.55)] flex items-center justify-between gap-3 backdrop-blur-xl">
           {/* LEFT SIDE: Small Horizontal Pill-Shaped Animated Blue/Cyan Gradient Voice Orb */}
           <button
             type="button"
             onClick={handlePillOrbClick}
-            className={`w-20 h-10 sm:w-22 sm:h-11 rounded-full p-0.5 relative flex items-center justify-center cursor-pointer transition-all active:scale-95 select-none shrink-0 ${
+            className={`w-14 h-14 sm:w-16 sm:h-16 rounded-full p-0.5 relative flex items-center justify-center cursor-pointer transition-all active:scale-95 select-none shrink-0 ${
               isListening
                 ? 'bg-gradient-to-r from-blue-600 via-cyan-400 to-teal-300 animate-pill-orb-glow shadow-[0_0_20px_rgba(6,182,212,0.7)] ring-2 ring-cyan-300/60'
                 : isSpeaking
