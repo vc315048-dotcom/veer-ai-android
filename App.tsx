@@ -693,8 +693,8 @@ export default function App() {
           retryCountdown={retryCountdown}
           onPlayMessage={handlePlayMessage}
           onStopPlayback={handleStopPlayback}
-          onSelectSuggestion={(suggestionText) => handleSendMessage(suggestionText)}
-          onRetryMessage={(query) => handleSendMessage(query)}
+          onSelectSuggestion={(suggestionText: string) => handleSendMessage(suggestionText)}
+          onRetryMessage={(query: string) => handleSendMessage(query)}
           onCancelCountdown={handleCancelCountdown}
         />
 
@@ -743,7 +743,7 @@ export default function App() {
           isOpen={isSettingsOpen}
           onClose={() => setIsSettingsOpen(false)}
           voiceSettings={voiceSettings}
-          onUpdateSettings={(newSettings) =>
+          onUpdateSettings={(newSettings: Partial<VoiceSettings>) =>
             setVoiceSettings((prev) => ({ ...prev, ...newSettings }))
           }
           onClearChat={handleClearChat}
