@@ -1,5 +1,5 @@
 import express from 'express';
-import { GoogleGenAI } from '@google/genai';
+import { GoogleGenAI, Modality } from '@google/genai';
 import path from 'path';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
@@ -256,7 +256,7 @@ app.post('/api/live-token', async (req, res) => {
         liveConnectConstraints: {
           model: 'gemini-3.8-live',
           config: {
-            responseModalities: ['AUDIO'],
+            responseModalities: [Modality.AUDIO],
             speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: 'Kore' } } },
             inputAudioTranscription: {},
             outputAudioTranscription: {},
@@ -532,7 +532,7 @@ app.post('/api/tts', async (req, res) => {
           },
         ],
         config: {
-          responseModalities: ['AUDIO'],
+          responseModalities: [Modality.AUDIO],
           speechConfig: {
             voiceConfig: {
               prebuiltVoiceConfig: { voiceName: 'Fenrir' },
