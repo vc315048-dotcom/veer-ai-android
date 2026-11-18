@@ -115,6 +115,8 @@ export class VeerLiveVoice {
       this.source = this.audioContext.createMediaStreamSource(this.stream);
       this.processor = this.audioContext.createScriptProcessor(4096, 1, 1);
       this.processor.onaudioprocess = (event) => {
+        const silentOutput = event.outputBuffer.getChannelData(0);
+        silentOutput.fill(0);
         if (this.stopped || !this.setupReady || this.socket?.readyState !== WebSocket.OPEN) return;
         const pcm = resampleTo16k(event.inputBuffer.getChannelData(0), this.audioContext?.sampleRate || 48000);
         this.socket.send(JSON.stringify({ realtime_input: { audio: {
