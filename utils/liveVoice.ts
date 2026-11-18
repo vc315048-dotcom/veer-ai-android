@@ -1,4 +1,4 @@
-import { GoogleGenAI, Modality } from '@google/genai';
+
 
 type LiveVoiceCallbacks = {
   onListening: (active: boolean) => void;
