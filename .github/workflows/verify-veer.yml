@@ -1,0 +1,31 @@
+name: VEER source verification
+
+on:
+  push:
+    branches:
+      - veer-fixed-source
+  workflow_dispatch:
+
+jobs:
+  web-build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+      - name: TypeScript check
+        run: npm run lint
+      - name: Production web build
+        run: npm run build
+      - name: Upload production web bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: veer-web-dist
+          path: dist/
+          if-no-files-found: error
