@@ -219,6 +219,68 @@ function parseGeminiError(err: any): GeminiErrorInfo {
   };
 }
 
+// Short-lived, single-use credentials for the real-time VEER Live Voice session.
+// The permanent Gemini API key never leaves this server.
+const liveTokenRequests = new Map<string, { count: number; resetAt: number }>();
+app.post('/api/live-token', async (req, res) => {
+  try {
+    const apiKey = (process.env.GEMINI_API_KEY || '').trim();
+    if (!apiKey) {
+      return res.status(503).json({ success: false, error: 'Live Voice अभी कॉन्फ़िगर नहीं है।' });
+    }
+
+    // Basic per-IP issuance throttle to reduce accidental token abuse.
+    const forwardedFor = req.headers['x-forwarded-for'];
+    const clientIp = (typeof forwardedFor === 'string' ? forwardedFor.split(',')[0] : req.socket.remoteAddress) || 'unknown';
+    const now = Date.now();
+    const previous = liveTokenRequests.get(clientIp);
+    if (previous && previous.resetAt > now && previous.count >= 4) {
+      return res.status(429).json({ success: false, error: 'बहुत जल्दी Live Voice शुरू किया गया। एक मिनट बाद फिर कोशिश करें।' });
+    }
+    if (!previous || previous.resetAt <= now) {
+      liveTokenRequests.set(clientIp, { count: 1, resetAt: now + 60_000 });
+    } else {
+      previous.count += 1;
+    }
+
+    const tokenClient = getAI();
+    const expiresAt = new Date(now + 30 * 60 * 1000).toISOString();
+    const token = await tokenClient.authTokens.create({
+      config: {
+        uses: 1,
+        expireTime: expiresAt,
+        newSessionExpireTime: new Date(now + 60_000).toISOString(),
+        liveConnectConstraints: {
+          model: 'gemini-3.8-live',
+          config: {
+            responseModalities: ['AUDIO'],
+            inputAudioTranscription: {},
+            outputAudioTranscription: {},
+            systemInstruction: {
+              parts: [{
+                text: VEER_SYSTEM_INSTRUCTION + '\\n\\nआप एक स्वाभाविक हिंदी बोलने वाले साथी हैं। छोटे, बातचीत जैसे जवाब दें। उपयोगकर्ता के बोलना पूरा होने पर जवाब दें। उपयोगकर्ता बीच में बोले तो अपनी आवाज़ रोककर उसे सुनें।'
+              }]
+            }
+          }
+        }
+      }
+    });
+
+    if (!token?.name) {
+      return res.status(502).json({ success: false, error: 'Live Voice token नहीं बन पाया।' });
+    }
+    return res.json({ success: true, token: token.name, expiresAt, model: 'gemini-3.8-live' });
+  } catch (error: any) {
+    const parsed = parseGeminiError(error);
+    console.error('[VEER] Live token error:', sanitizeLog(parsed.sanitizedDetails));
+    return res.status(parsed.httpStatus).json({
+      success: false,
+      error: parsed.userMessage,
+      errorCode: parsed.code
+    });
+  }
+});
+
 // Health check endpoint
 app.get('/api/health', (_req, res) => {
   res.json({
