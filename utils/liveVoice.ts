@@ -1,3 +1,4 @@
+import { apiUrl } from './api';
 
 
 type LiveVoiceCallbacks = {
@@ -58,7 +59,7 @@ export class VeerLiveVoice {
     this.callbacks = callbacks;
     this.stopped = false;
     try {
-      const tokenResponse = await fetch('/api/live-token', { method: 'POST' });
+      const tokenResponse = await fetch(apiUrl('/api/live-token', { method: 'POST' });
       const tokenData = await tokenResponse.json();
       if (!tokenResponse.ok || !tokenData?.token) {
         throw new Error(tokenData?.error || 'Live Voice token नहीं मिला।');
@@ -119,7 +120,7 @@ export class VeerLiveVoice {
         silentOutput.fill(0);
         if (this.stopped || !this.setupReady || this.socket?.readyState !== WebSocket.OPEN) return;
         const pcm = resampleTo16k(event.inputBuffer.getChannelData(0), this.audioContext?.sampleRate || 48000);
-        this.socket.send(JSON.stringify({ realtime_input: { audio: {
+        this.socket.send(JSON.stringify({ realtimeInput: { audio: {
           mimeType: 'audio/pcm;rate=16000', data: floatToPcm16Base64(pcm),
         } } }));
       };
