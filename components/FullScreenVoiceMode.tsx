@@ -737,361 +737,86 @@ export const FullScreenVoiceMode: React.FC<FullScreenVoiceModeProps> = ({
 
   if (!isOpen) return null;
 
-  // Active veer message (text or error)
   const currentVeerAnswer = lastVeerMessage?.text || lastMessageText || '';
-  const isCurrentVeerError = !!lastVeerMessage?.isError;
-  const activePromptText = liveUserPrompt || lastUserPrompt || '';
 
   return (
-    <div className="absolute inset-0 z-50 bg-black flex flex-col justify-between p-4 text-slate-100 select-none overflow-hidden animate-fadeIn">
-      {/* Gemini-like live voice canvas: deep black background and a soft animated voice sphere */}
-      <div className="absolute inset-0 pointer-events-none overflow-hidden bg-black">
-        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_rgba(24,54,125,0.16)_0%,_rgba(0,0,0,0)_58%)]" />
-        <div className={`absolute left-1/2 top-[46%] -translate-x-1/2 -translate-y-1/2 w-[min(58vw,270px)] h-[min(58vw,270px)] rounded-full transition-all duration-700 ${
-          isSpeaking
-            ? 'scale-110 shadow-[0_0_90px_rgba(70,125,255,0.42)]'
-            : isListening
-            ? 'scale-105 shadow-[0_0_75px_rgba(0,210,235,0.35)]'
-            : isLoading
-            ? 'scale-100 shadow-[0_0_65px_rgba(120,120,255,0.30)]'
-            : 'scale-100 shadow-[0_0_45px_rgba(70,115,255,0.20)]'
-        }`} style={{ background: 'linear-gradient(145deg, #2468ed 0%, #6799ff 38%, #dce8ff 58%, #a9c5ff 100%)' }}>
-          <div className="absolute inset-[5%] rounded-full bg-[radial-gradient(ellipse_at_68%_30%,_rgba(255,255,255,0.85),_rgba(255,255,255,0.08)_30%,_transparent_58%)]" />
-          <div className="absolute inset-0 rounded-full bg-[linear-gradient(155deg,transparent_35%,rgba(255,255,255,0.46)_54%,transparent_72%)]" />
+    <div className="absolute inset-0 z-50 bg-black text-white select-none overflow-hidden animate-fadeIn">
+      {/* Minimal Gemini Live-style screen: no conversation cards or diagnostic banners. */}
+      <div className="absolute inset-0 pointer-events-none bg-black">
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_rgba(18,45,105,0.18)_0%,_transparent_62%)]" />
+        <div
+          className={`absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[min(56vw,370px)] h-[min(56vw,370px)] rounded-full transition-all duration-700 ${
+            isSpeaking
+              ? 'scale-110 shadow-[0_0_110px_rgba(90,145,255,0.55)]'
+              : isListening
+              ? 'scale-105 shadow-[0_0_95px_rgba(0,205,235,0.42)]'
+              : isLoading
+              ? 'scale-100 shadow-[0_0_85px_rgba(110,125,255,0.38)]'
+              : 'scale-100 shadow-[0_0_65px_rgba(55,110,245,0.30)]'
+          }`}
+          style={{ background: 'linear-gradient(145deg, #2468ed 0%, #6799ff 38%, #dce8ff 58%, #a9c5ff 100%)' }}
+        >
+          <div className="absolute inset-[5%] rounded-full bg-[radial-gradient(ellipse_at_68%_30%,_rgba(255,255,255,0.88),_rgba(255,255,255,0.08)_32%,_transparent_60%)]" />
+          <div className="absolute inset-0 rounded-full bg-[linear-gradient(155deg,transparent_35%,rgba(255,255,255,0.42)_54%,transparent_72%)]" />
         </div>
       </div>
 
-      {/* Top Header Bar */}
-      <header className="relative z-10 flex items-center justify-between pt-2 px-1">
-        {/* Left: Superhero Badge */}
-        <div className="flex items-center space-x-2">
-          <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-blue-600 via-cyan-500 to-indigo-400 p-0.5 shadow-md shadow-cyan-500/20">
-            <div className="w-full h-full bg-slate-950 rounded-[10px] flex items-center justify-center">
-              <Shield className="w-4 h-4 text-cyan-400" />
-            </div>
-          </div>
-          <div className="flex items-center space-x-1.5">
-            <span className="font-extrabold text-sm text-white tracking-wide">वीर</span>
-            <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 font-bold uppercase tracking-wider">
-              वॉइस मोड
-            </span>
-          </div>
-        </div>
-
-        {/* Right Settings Pills */}
-        <div className="flex items-center space-x-2">
-          {/* Language Switch */}
-          <button
-            type="button"
-            onClick={() => {
-              stopListening();
-              const next = speechLanguage === 'hi-IN' ? 'en-IN' : 'hi-IN';
-              setSpeechLanguage(next);
-              speechLanguageRef.current = next;
-              setTimeout(() => {
-                if (isOpenRef.current && !isMicDisabledRef.current) {
-                  startListening(true);
-                }
-              }, 200);
-            }}
-            className="text-[11px] font-bold px-2.5 py-1 rounded-xl bg-slate-900/90 border border-slate-800 text-cyan-300 hover:bg-slate-800 active:scale-95 transition-all shadow-sm"
-            title="भाषा बदलें"
-          >
-            {speechLanguage === 'hi-IN' ? '🇮🇳 हि' : '🇮🇳 En'}
-          </button>
-
-          {/* Continuous Mode Pill */}
-          <button
-            type="button"
-            onClick={() => {
-              if (continuousModeEnabled) {
-                stopListening();
-              }
-              onToggleContinuousMode();
-            }}
-            className={`text-[11px] font-bold px-2.5 py-1 rounded-xl border flex items-center gap-1.5 active:scale-95 transition-all shadow-sm ${
-              continuousModeEnabled
-                ? 'bg-emerald-950/80 border-emerald-500/60 text-emerald-300 ring-1 ring-emerald-500/30'
-                : 'bg-slate-900/90 border-slate-800 text-slate-400'
-            }`}
-            title="लगातार सुनना चालू / बंद करें"
-          >
-            <Radio className={`w-3 h-3 ${continuousModeEnabled ? 'text-emerald-400 animate-pulse' : 'text-slate-500'}`} />
-            <span>लगातार: {continuousModeEnabled ? 'ON' : 'OFF'}</span>
-          </button>
-        </div>
+      <header className="absolute top-0 right-0 z-20 p-4 pt-[max(env(safe-area-inset-top),16px)]">
+        <button
+          type="button"
+          onClick={handleRunTtsDiagnostic}
+          disabled={isDiagnosticRunning || isLoading || isSpeaking}
+          className="w-14 h-14 rounded-full bg-white/15 border border-white/20 backdrop-blur-xl flex items-center justify-center text-white shadow-lg active:scale-95 disabled:opacity-50"
+          aria-label="Voice settings and sound test"
+          title="आवाज़ जाँचें"
+        >
+          <Volume2 className="w-6 h-6" />
+        </button>
       </header>
-            {/* Main Conversation Canvas (Clean, Responsive, Accurate Status) */}
-      <main className="relative z-10 flex-1 flex flex-col items-center justify-center px-3 my-auto pt-4">
-        <div className="w-full max-w-sm flex flex-col items-center justify-center space-y-4 mt-[min(34vh,250px)]">
-          {/* 1. Live Spoken Words (While speaking into mic) */}
-          {interimTranscript && (
-            <div className="w-full px-5 py-4 rounded-3xl bg-cyan-950/50 border border-cyan-500/40 text-center animate-fadeIn shadow-[0_4px_25px_rgba(6,182,212,0.15)] backdrop-blur-md">
-              <span className="text-[11px] font-bold text-cyan-300 uppercase tracking-wider block mb-1">
-                🎙️ आपकी आवाज़:
-              </span>
-              <p className="text-base font-medium text-cyan-100 leading-relaxed italic">
-                “{interimTranscript}”
-              </p>
-            </div>
-          )}
 
-          {/* 2. Committed User Question (Persists while AI is thinking and replying) */}
-          {!interimTranscript && activePromptText && (
-            <div className="w-full px-4 py-2.5 rounded-2xl bg-slate-900/80 border border-slate-800 text-center animate-fadeIn">
-              <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide block mb-0.5">
-                आपने पूछा:
-              </span>
-              <p className="text-sm font-medium text-slate-200 line-clamp-2">
-                “{activePromptText}”
-              </p>
-            </div>
-          )}
-
-          {/* 3. AI Processing / Thinking State */}
-          {isLoading && (
-            <div className="w-full p-5 rounded-3xl bg-slate-900/80 border border-cyan-500/30 text-center space-y-3 animate-fadeIn shadow-lg backdrop-blur-md">
-              <div className="w-8 h-8 border-2 border-cyan-400/30 border-t-cyan-300 rounded-full animate-spin mx-auto" />
-              <p className="text-sm font-semibold text-amber-300 animate-pulse">
-                वीर जवाब तैयार कर रहा है...
-              </p>
-            </div>
-          )}
-
-          {/* 4. Real AI Response or Error (Displayed & Spoken via TTS) */}
-          {!isLoading && currentVeerAnswer && (
-            <div
-              className={`w-full px-5 py-4 rounded-3xl border text-center animate-fadeIn shadow-lg backdrop-blur-md ${
-                isCurrentVeerError
-                  ? 'bg-rose-950/50 border-rose-500/40 text-rose-100'
-                  : 'bg-blue-950/40 border-blue-500/30 text-slate-100'
-              }`}
-            >
-              <div
-                className={`flex items-center justify-center gap-2 text-xs font-bold mb-2 ${
-                  isCurrentVeerError ? 'text-rose-400' : 'text-cyan-300'
-                }`}
-              >
-                {isCurrentVeerError ? (
-                  <AlertTriangle className="w-4 h-4 text-rose-400" />
-                ) : (
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      if (isSpeaking) {
-                        onStopPlayback?.();
-                      } else if (lastVeerMessage) {
-                        onPlayMessage?.(lastVeerMessage);
-                      }
-                    }}
-                    className="p-1 rounded-lg hover:bg-cyan-500/20 text-cyan-400 transition-colors flex items-center gap-1 active:scale-95 cursor-pointer"
-                    title={isSpeaking ? 'आवाज़ रोकें' : 'दोबारा सुनें (Replay)'}
-                    aria-label="Play or stop voice response"
-                  >
-                    <Volume2 className={`w-4 h-4 ${isSpeaking ? 'animate-pulse text-cyan-300' : 'text-cyan-400'}`} />
-                  </button>
-                )}
-                <span>{isCurrentVeerError ? 'त्रुटि (Error)' : isSpeaking ? 'वीर बोल रहा है' : 'वीर का उत्तर'}</span>
-              </div>
-              <p className="text-sm text-slate-200 leading-relaxed max-h-48 overflow-y-auto custom-scrollbar">
-                {currentVeerAnswer}
-              </p>
-            </div>
-          )}
-
-          {/* 5. Listening Status Hint when ready for next input */}
-          {!isLoading && isListening && !interimTranscript && (
-            <div className="text-center space-y-2 py-2">
-              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-cyan-500/10 border border-cyan-500/30 text-cyan-300 text-xs font-semibold animate-pulse">
-                <span className="w-2 h-2 rounded-full bg-cyan-400 animate-ping" />
-                <span>वीर सुन रहा है... अब बोलिए</span>
-              </div>
-              <p className="text-xs text-slate-400">आप जो बोलेंगे, वह सीधे वीर तक पहुँचेगा</p>
-            </div>
-          )}
-
-          {/* 6. Idle State (if listening is paused) */}
-          {!isLoading && !isListening && !isSpeaking && !interimTranscript && !currentVeerAnswer && (
-            <div className="text-center space-y-2 py-4">
-              <p className="text-sm font-medium text-slate-300">
-                बोलना शुरू करने के लिए नीचे दिए गए ओर्ब पर टैप करें
-              </p>
-            </div>
-          )}
-
-          {/* Hands-Free Voice Commands Hints & TTS Diagnostic Trigger */}
-          <div className="flex flex-wrap items-center justify-center gap-2">
-            <div className="flex items-center justify-center gap-2 text-[11px] text-slate-400 bg-slate-900/60 px-3.5 py-1.5 rounded-full border border-slate-800/80">
-              <span className="text-amber-300 font-medium">⏸️ “वीर, आराम करो”</span>
-              <span className="text-slate-600">•</span>
-              <span className="text-emerald-300 font-medium">▶️ “वीर, फिर सुनो”</span>
-            </div>
-
-            {/* Diagnostic Test Button (speaks "नमस्ते, मैं वीर हूँ") */}
-            <button
-              type="button"
-              onClick={handleRunTtsDiagnostic}
-              disabled={isDiagnosticRunning || isLoading || isSpeaking}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-slate-900/90 hover:bg-slate-800 text-cyan-300 hover:text-white border border-cyan-500/40 text-[11px] font-medium transition-all active:scale-95 shadow-sm disabled:opacity-50 cursor-pointer"
-              title="TTS आवाज़ टेस्ट करें: 'नमस्ते, मैं वीर हूँ'"
-              aria-label="Run TTS audio diagnostic test"
-            >
-              <Volume2 className={`w-3.5 h-3.5 ${isDiagnosticRunning ? 'animate-pulse text-amber-400' : 'text-cyan-400'}`} />
-              <span>{isDiagnosticRunning ? (diagnosticStatus || 'जाँच हो रही है...') : '🔊 TTS टेस्ट'}</span>
-            </button>
-          </div>
-
-          {/* Diagnostic Result Banner */}
-          {diagnosticResult && (
-            <div
-              className={`w-full max-w-sm px-3.5 py-2 rounded-2xl text-xs text-center border animate-fadeIn shadow-md ${
-                diagnosticResult.success
-                  ? 'bg-emerald-950/80 border-emerald-500/50 text-emerald-200'
-                  : 'bg-amber-950/80 border-amber-500/50 text-amber-200'
-              }`}
-            >
-              <div className="font-semibold flex items-center justify-center gap-1.5">
-                <span>{diagnosticResult.success ? '✅ TTS प्लेबैक सफल' : '⚠️ TTS प्लेबैक सूचना'}</span>
-                <span className="text-[10px] text-slate-300 font-mono">[{diagnosticResult.method}]</span>
-              </div>
-              <p className="text-[11px] mt-0.5">{diagnosticResult.details}</p>
-              {diagnosticResult.error && (
-                <p className="text-[10.5px] mt-1 text-rose-300 font-mono bg-black/40 px-2 py-0.5 rounded">
-                  {diagnosticResult.error}
-                </p>
-              )}
-              {diagnosticResult.hindiVoices.length > 0 ? (
-                <p className="text-[10px] text-cyan-300 mt-1 truncate">
-                  हिन्दी आवाज़ें ({diagnosticResult.hindiVoices.length}): {diagnosticResult.hindiVoices.join(', ')}
-                </p>
-              ) : (
-                <p className="text-[10px] text-amber-300 mt-1">
-                  डिफ़ॉल्ट सिस्टम आवाज़ सक्रिय (कोई विशिष्ट Hindi Voice पैक नहीं मिला)
-                </p>
-              )}
-            </div>
-          )}
-
-          {/* Error notification if microphone fails */}
-          {speechError && (
-            <div className="px-3.5 py-2 rounded-2xl bg-rose-950/80 border border-rose-500/50 text-rose-200 text-xs text-center animate-fadeIn shadow-md">
-              {speechError}
-            </div>
-          )}
-
-          {/* Error notification if TTS audio playback fails */}
-          {ttsError && (
-            <div className="px-3.5 py-2 rounded-2xl bg-amber-950/80 border border-amber-500/50 text-amber-200 text-xs text-center animate-fadeIn shadow-md">
-              ⚠️ आवाज़ (TTS): {ttsError}
-            </div>
-          )}
-
-          {/* Iframe notice if in AI Studio embedded preview */}
-          {showIframeNotice && (
-            <div className="p-3 rounded-2xl bg-slate-900 border border-amber-500/40 text-xs text-center shadow-lg">
-              <p className="text-amber-300 font-bold mb-1">⚠️ माइक्रोफ़ोन अनुमति आवश्यक</p>
-              <a
-                href={typeof window !== 'undefined' ? window.location.href : '#'}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl bg-amber-500 text-slate-950 font-bold hover:bg-amber-400 text-xs mt-1"
-              >
-                <ExternalLink className="w-3.5 h-3.5" />
-                <span>अलग टैब में खोलें</span>
-              </a>
-            </div>
-          )}
+      {(speechError || ttsError || diagnosticStatus) && (
+        <div className="absolute top-20 left-5 right-5 z-20 rounded-2xl bg-slate-900/85 border border-white/15 px-4 py-3 text-center text-sm text-slate-200 backdrop-blur-xl">
+          {speechError || ttsError || diagnosticStatus}
         </div>
-      </main>
+      )}
 
-      {/* Gemini-like bottom voice control bar */}
-      <footer className="relative z-10 w-full flex justify-center pb-5 sm:pb-7 px-3">
-        <div className="w-full max-w-[420px] rounded-full p-2 bg-white/15 border border-white/20 shadow-[0_8px_35px_rgba(0,0,0,0.55)] flex items-center justify-between gap-3 backdrop-blur-xl">
-          {/* LEFT SIDE: Small Horizontal Pill-Shaped Animated Blue/Cyan Gradient Voice Orb */}
+      <footer className="absolute bottom-0 left-0 right-0 z-20 px-5 pb-[max(env(safe-area-inset-bottom),20px)]">
+        <div className="mx-auto w-full max-w-xl flex items-center gap-3">
           <button
             type="button"
             onClick={handlePillOrbClick}
-            className={`w-14 h-14 sm:w-16 sm:h-16 rounded-full p-0.5 relative flex items-center justify-center cursor-pointer transition-all active:scale-95 select-none shrink-0 ${
-              isListening
-                ? 'bg-gradient-to-r from-blue-600 via-cyan-400 to-teal-300 animate-pill-orb-glow shadow-[0_0_20px_rgba(6,182,212,0.7)] ring-2 ring-cyan-300/60'
-                : isSpeaking
-                ? 'bg-gradient-to-r from-blue-700 via-cyan-500 to-indigo-500 animate-pill-orb-glow shadow-[0_0_20px_rgba(59,130,246,0.65)] ring-2 ring-blue-400/50'
-                : isLoading
-                ? 'bg-gradient-to-r from-blue-600 via-amber-500 to-cyan-500 animate-pulse shadow-[0_0_15px_rgba(245,158,11,0.5)]'
-                : 'bg-gradient-to-r from-blue-700 via-cyan-500 to-indigo-600 hover:brightness-110 shadow-[0_0_14px_rgba(6,182,212,0.4)]'
-            }`}
-            title={
-              isListening
-                ? 'सुनना रोकें'
-                : isSpeaking
-                ? 'बोलना रोकें'
-                : isLoading
-                ? 'जवाब आ रहा है...'
-                : 'बोलने के लिए दबाएं'
-            }
-            aria-label="Toggle voice listening"
+            disabled={isLoading}
+            className="flex-1 h-[76px] rounded-full bg-white/20 border border-white/25 backdrop-blur-2xl flex items-center px-5 text-white shadow-[0_8px_35px_rgba(0,0,0,0.45)] active:scale-[0.99] disabled:opacity-60"
+            aria-label={isListening ? 'वीर सुन रहा है' : 'बोलने के लिए दबाएँ'}
           >
-            {/* Inner Pill Core with Dynamic Audio Waves or State Icon */}
-            <div className="w-full h-full rounded-full bg-gradient-to-r from-slate-950/80 via-blue-950/70 to-slate-950/80 flex items-center justify-center px-2 border border-cyan-300/30">
+            <span className="w-12 h-12 rounded-full bg-gradient-to-br from-blue-500 via-cyan-400 to-blue-700 shadow-[0_0_24px_rgba(0,190,255,0.7)] flex items-center justify-center shrink-0">
               {isListening ? (
-                <div className="flex items-center space-x-1 h-6">
+                <span className="flex items-center gap-1 h-6">
                   {audioLevel.map((height, i) => (
-                    <span
-                      key={i}
-                      style={{ height: `${Math.min(height, 22)}px` }}
-                      className="w-1 bg-gradient-to-t from-cyan-400 to-white rounded-full transition-all duration-75 shadow-sm shadow-cyan-300"
-                    />
+                    <span key={i} style={{ height: `${Math.min(height, 22)}px` }} className="w-1 rounded-full bg-white transition-all duration-75" />
                   ))}
-                </div>
+                </span>
               ) : isSpeaking ? (
-                <div className="flex items-center space-x-1 text-cyan-300">
-                  <Volume2 className="w-4 h-4 animate-pulse drop-shadow-[0_0_8px_rgba(6,182,212,0.8)]" />
-                  <span className="text-[10px] font-bold text-cyan-200">बोल रहा है</span>
-                </div>
+                <Volume2 className="w-5 h-5 text-white animate-pulse" />
               ) : isLoading ? (
-                <div className="w-4 h-4 border-2 border-cyan-400/40 border-t-cyan-300 rounded-full animate-spin" />
+                <span className="w-5 h-5 rounded-full border-2 border-white/40 border-t-white animate-spin" />
               ) : (
-                <div className="flex items-center space-x-1 text-cyan-300">
-                  <Mic className="w-4 h-4 stroke-[2.2] drop-shadow-[0_0_6px_rgba(6,182,212,0.6)]" />
-                  <span className="text-[10px] font-bold text-slate-200">बोलें</span>
-                </div>
+                <Mic className="w-5 h-5 text-white" />
               )}
-            </div>
+            </span>
+            <span className="flex-1 text-center text-sm font-semibold text-cyan-100 px-3 truncate">
+              {isListening ? 'वीर सुन रहा है...' : isSpeaking ? 'वीर बोल रहा है...' : isLoading ? 'वीर सोच रहा है...' : 'वीर से बात करें'}
+            </span>
           </button>
 
-          {/* MIDDLE: Status Hint Label */}
-          <div className="flex-1 text-center min-w-0 px-1">
-            <span
-              className={`text-xs font-semibold tracking-wide truncate block ${
-                isListening
-                  ? 'text-cyan-300 animate-pulse'
-                  : isSpeaking
-                  ? 'text-blue-300'
-                  : isLoading
-                  ? 'text-amber-300 animate-pulse'
-                  : 'text-slate-400'
-              }`}
-            >
-              {isListening
-                ? 'वीर सुन रहा है...'
-                : isSpeaking
-                ? 'वीर बोल रहा है...'
-                : isLoading
-                ? 'सोच रहा है...'
-                : 'टैप कर बोलें'}
-            </span>
-          </div>
-
-          {/* RIGHT SIDE: Round Dark Close (X) Button */}
           <button
             type="button"
             onClick={handleCloseVoiceMode}
-            className="w-10 h-10 sm:w-11 sm:h-11 rounded-full bg-slate-900/95 hover:bg-slate-800 border border-slate-700/80 hover:border-cyan-400/60 text-slate-300 hover:text-white flex items-center justify-center transition-all shadow-md active:scale-90 cursor-pointer shrink-0 group"
-            title="वॉइस मोड बंद करें और चैट बॉक्स पर लौटें (X)"
-            aria-label="Close Voice Mode"
+            className="w-[76px] h-[76px] rounded-full bg-white text-black flex items-center justify-center shadow-lg active:scale-95 shrink-0"
+            aria-label="Voice Mode बंद करें"
+            title="बंद करें"
           >
-            <X className="w-5 h-5 group-hover:rotate-90 transition-transform duration-200 text-slate-300 group-hover:text-white" />
+            <X className="w-8 h-8" />
           </button>
         </div>
       </footer>
