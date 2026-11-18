@@ -59,7 +59,7 @@ export class VeerLiveVoice {
     this.callbacks = callbacks;
     this.stopped = false;
     try {
-      const tokenResponse = await fetch(apiUrl('/api/live-token', { method: 'POST' });
+      const tokenResponse = await fetch(apiUrl('/api/live-token'), { method: 'POST' });
       const tokenData = await tokenResponse.json();
       if (!tokenResponse.ok || !tokenData?.token) {
         throw new Error(tokenData?.error || 'Live Voice token नहीं मिला।');
