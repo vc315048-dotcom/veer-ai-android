@@ -5,6 +5,7 @@ import { speechManager, TtsDiagnosticResult } from '../utils/speechManager';
 import { isNativeAndroid, nativeVoiceService } from '../utils/nativeVoiceService';
 import { ChatMessage } from '../types';
 import ManualSpeech from '../utils/manualSpeech';
+import { VeerLiveVoice } from '../utils/liveVoice';
 interface FullScreenVoiceModeProps {
   isOpen: boolean;
   onClose: () => void;
@@ -51,6 +52,8 @@ export const FullScreenVoiceMode: React.FC<FullScreenVoiceModeProps> = ({
   const [showIframeNotice, setShowIframeNotice] = useState<boolean>(false);
   const [isInIframe, setIsInIframe] = useState<boolean>(false);
   const [audioLevel, setAudioLevel] = useState<number[]>([10, 18, 28, 18, 10]);
+  const [liveVoiceActive, setLiveVoiceActive] = useState(false);
+  const liveVoiceRef = useRef<VeerLiveVoice | null>(null);
 
   // TTS Playback Diagnostic State
   const [isDiagnosticRunning, setIsDiagnosticRunning] = useState<boolean>(false);
@@ -609,6 +612,7 @@ export const FullScreenVoiceMode: React.FC<FullScreenVoiceModeProps> = ({
     ]
   );
   
+  // Live Voice starts only after the user taps the microphone, which unlocks Android audio.
   // Start listening automatically when Android Voice Mode opens.
   // Continuous mode uses the native foreground service.
   // Manual mode starts one native Hindi speech session.
@@ -643,6 +647,9 @@ export const FullScreenVoiceMode: React.FC<FullScreenVoiceModeProps> = ({
         return () => clearTimeout(timer);
       }
     } else {
+      void liveVoiceRef.current?.stop();
+      liveVoiceRef.current = null;
+      setLiveVoiceActive(false);
       sessionIdRef.current++;
       stopListening();
 
@@ -656,16 +663,17 @@ export const FullScreenVoiceMode: React.FC<FullScreenVoiceModeProps> = ({
 
   // Requirement 4: Pause/stop listening immediately whenever AI is preparing or speaking
   useEffect(() => {
+    if (liveVoiceActive) return;
     if (isLoading || isSpeaking) {
       if (isActivelyListeningRef.current || isListening || isStartingRef.current) {
         stopListening();
       }
     }
-  }, [isLoading, isSpeaking, isListening, stopListening]);
+  }, [isLoading, isSpeaking, isListening, stopListening, liveVoiceActive]);
 
   // Requirement 5: Automatically start listening after assistant finishes speaking (Continuous Mode)
   useEffect(() => {
-    if (!isOpen || autoListenTrigger === 0 || autoListenTrigger === lastTriggerHandledRef.current) {
+    if (liveVoiceActive || !isOpen || autoListenTrigger === 0 || autoListenTrigger === lastTriggerHandledRef.current) {
       return;
     }
     lastTriggerHandledRef.current = autoListenTrigger;
@@ -684,11 +692,13 @@ export const FullScreenVoiceMode: React.FC<FullScreenVoiceModeProps> = ({
     }, 150);
 
     return () => clearTimeout(timer);
-  }, [autoListenTrigger, isOpen, startListening]);
+  }, [autoListenTrigger, isOpen, startListening, liveVoiceActive]);
 
   // Clean up on unmount
   useEffect(() => {
     return () => {
+      void liveVoiceRef.current?.stop();
+      liveVoiceRef.current = null;
       sessionIdRef.current++;
       stopListening();
       if (errorTimerRef.current) clearTimeout(errorTimerRef.current);
@@ -697,8 +707,38 @@ export const FullScreenVoiceMode: React.FC<FullScreenVoiceModeProps> = ({
     };
   }, [stopListening]);
 
-  // Toggle listening by clicking the pill orb
-  const handlePillOrbClick = () => {
+  // Toggle the real-time Gemini Live audio session from the user's microphone tap.
+  const handlePillOrbClick = async () => {
+    if (liveVoiceRef.current) {
+      await liveVoiceRef.current.stop();
+      liveVoiceRef.current = null;
+      setLiveVoiceActive(false);
+      setIsListening(false);
+      onListeningStateChange?.('वीर की Live Voice बंद है');
+      return;
+    }
+    try {
+      onStopPlayback?.();
+      speechManager.stop();
+      const live = new VeerLiveVoice();
+      liveVoiceRef.current = live;
+      setSpeechError(null);
+      onListeningStateChange?.('वीर Live Voice से जुड़ रहा है...');
+      await live.start({
+        onListening: (active) => { setIsListening(active); if (active) onListeningStateChange?.('वीर सुन रहा है...'); },
+        onSpeaking: (active) => { if (active) onListeningStateChange?.('वीर बोल रहा है...'); },
+        onTranscript: (text) => setLiveUserPrompt(text),
+        onError: (message) => showTemporaryError(message),
+      });
+      setLiveVoiceActive(true);
+    } catch (error: any) {
+      liveVoiceRef.current = null;
+      setLiveVoiceActive(false);
+      setIsListening(false);
+      showTemporaryError(error?.message || 'Live Voice शुरू नहीं हो सकी।');
+    }
+    return;
+
     if (isSpeaking) {
       onStopPlayback?.();
       return;
@@ -805,7 +845,7 @@ export const FullScreenVoiceMode: React.FC<FullScreenVoiceModeProps> = ({
               )}
             </span>
             <span className="flex-1 text-center text-sm font-semibold text-cyan-100 px-3 truncate">
-              {isListening ? 'वीर सुन रहा है...' : isSpeaking ? 'वीर बोल रहा है...' : isLoading ? 'वीर सोच रहा है...' : 'वीर से बात करें'}
+              {isListening ? 'वीर सुन रहा है...' : isSpeaking ? 'वीर बोल रहा है...' : isLoading ? 'वीर सोच रहा है...' : liveVoiceActive ? 'Live Voice बंद करें' : 'वीर से बात करें'}
             </span>
           </button>
 
