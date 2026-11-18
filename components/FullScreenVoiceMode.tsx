@@ -628,7 +628,7 @@ export const FullScreenVoiceMode: React.FC<FullScreenVoiceModeProps> = ({
       const shouldStartManualAndroid =
         isNativeAndroid() && !continuousModeRef.current;
 
-      if (continuousModeRef.current || shouldStartManualAndroid) {
+      if (false && (continuousModeRef.current || shouldStartManualAndroid)) {
         const timer = setTimeout(() => {
           if (
             isOpenRef.current &&
