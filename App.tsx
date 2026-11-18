@@ -175,16 +175,18 @@ export default function App() {
   // Schedule auto-listen ONLY if continuous mode is authoritatively enabled AND Voice Mode is open
   const scheduleAutoListen = useCallback(() => {
     cancelAutoListen();
-    if (!continuousModeEnabledRef.current || !isVoiceModeOpenRef.current) return;
+    if (!continuousModeEnabledRef.current) return;
 
-    // Give the user a full 3 seconds after VEER finishes speaking before reopening the microphone.
-    // On Android, the foreground service owns the microphone in continuous mode.
+    // Keep the microphone paused while VEER prepares/speaks, then give the user
+    // 3 full seconds before the native listener is resumed. This also works
+    // when the foreground service receives a command while Voice Mode is closed.
     autoListenTimerRef.current = setTimeout(() => {
       autoListenTimerRef.current = null;
-      if (continuousModeEnabledRef.current && isVoiceModeOpenRef.current) {
-        if (isNativeAndroid()) {
-          void nativeVoiceService.resumeListening();
-        }
+      if (!continuousModeEnabledRef.current) return;
+      if (isNativeAndroid()) {
+        void nativeVoiceService.resumeListening();
+      }
+      if (isVoiceModeOpenRef.current) {
         setAutoListenTrigger((prev) => prev + 1);
       }
     }, 3000);
