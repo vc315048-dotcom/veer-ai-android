@@ -756,6 +756,10 @@ export const FullScreenVoiceMode: React.FC<FullScreenVoiceModeProps> = ({
 
   // Requirement 9 & 10: X button immediately halts all sessions, auto-restarts, and returns to Chat Box
   const handleCloseVoiceMode = () => {
+    void liveVoiceRef.current?.stop();
+    liveVoiceRef.current = null;
+    setLiveVoiceActive(false);
+    setIsListening(false);
     soundFx.playPowerDown();
     isOpenRef.current = false;
     sessionIdRef.current++;
