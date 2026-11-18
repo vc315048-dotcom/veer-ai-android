@@ -86,7 +86,7 @@ export class VeerLiveVoice {
             },
             inputAudioTranscription: {},
             outputAudioTranscription: {},
-            realtimeInputConfig: { automaticActivityDetection: { disabled: false, silenceDurationMs: 1200 } },
+            realtimeInputConfig: { automaticActivityDetection: { disabled: false, silenceDurationMs: 3000 } },
             systemInstruction: { parts: [{ text: 'आप वीर हैं। उपयोगकर्ता से स्वाभाविक, दोस्ताना और स्पष्ट हिन्दी में बात करें। उत्तर बोलचाल के हों और सामान्यतः छोटे रखें। उपयोगकर्ता बोलना शुरू करे तो अपनी आवाज़ तुरंत रोकें और उसे सुनें।' }] },
           } }));
         };
