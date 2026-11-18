@@ -243,7 +243,10 @@ app.post('/api/live-token', async (req, res) => {
       previous.count += 1;
     }
 
-    const tokenClient = getAI();
+    const tokenClient = new GoogleGenAI({
+      apiKey,
+      httpOptions: { apiVersion: 'v1beta', headers: { 'User-Agent': 'aistudio-build' } },
+    });
     const expiresAt = new Date(now + 30 * 60 * 1000).toISOString();
     const token = await tokenClient.authTokens.create({
       config: {
