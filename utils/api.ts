@@ -1,19 +1,17 @@
 /**
  * API routing for VEER.
  *
- * The Android APK is served from capacitor://localhost, so relative /api
- * requests hit the WebView's local asset server and return index.html.
- * Always call the deployed VEER backend instead.
+ * In the Android APK, relative /api requests resolve against the local
+ * WebView asset origin and can return index.html instead of JSON.
+ * Use the deployed VEER backend origin for API calls.
  */
-const KNOWN_API_ORIGIN = 'https://veerhero-assistant.ai.studio';
-const configuredOrigin = (import.meta.env.VITE_API_BASE_URL || '').trim();
-const apiOrigin = (configuredOrigin || KNOWN_API_ORIGIN).replace(/\/+$/, '');
+const API_ORIGIN = 'https://veerhero-assistant.ai.studio';
 
 export function apiUrl(path: string): string {
-  const normalizedPath = path.startsWith('/') ? path : `/${path}`;
-  return `${apiOrigin}${normalizedPath}`;
+  const normalizedPath = path.startsWith('/') ? path : '/' + path;
+  return API_ORIGIN + normalizedPath;
 }
 
 export function getApiOrigin(): string {
-  return apiOrigin;
+  return API_ORIGIN;
 }
