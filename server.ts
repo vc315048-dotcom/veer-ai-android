@@ -260,7 +260,7 @@ app.post('/api/live-token', async (req, res) => {
             speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: 'Kore' } } },
             inputAudioTranscription: {},
             outputAudioTranscription: {},
-            realtimeInputConfig: { automaticActivityDetection: { disabled: false, silenceDurationMs: 1200 } }
+            realtimeInputConfig: { automaticActivityDetection: { disabled: false, silenceDurationMs: 3000 } }
           }
         }
       }
