@@ -53,6 +53,8 @@ export const FullScreenVoiceMode: React.FC<FullScreenVoiceModeProps> = ({
   const [isInIframe, setIsInIframe] = useState<boolean>(false);
   const [audioLevel, setAudioLevel] = useState<number[]>([10, 18, 28, 18, 10]);
   const [liveVoiceActive, setLiveVoiceActive] = useState(false);
+  const [liveSpeaking, setLiveSpeaking] = useState(false);
+  const displaySpeaking = isSpeaking || liveSpeaking;
   const liveVoiceRef = useRef<VeerLiveVoice | null>(null);
 
   // TTS Playback Diagnostic State
@@ -713,6 +715,7 @@ export const FullScreenVoiceMode: React.FC<FullScreenVoiceModeProps> = ({
       await liveVoiceRef.current.stop();
       liveVoiceRef.current = null;
       setLiveVoiceActive(false);
+      setLiveSpeaking(false);
       setIsListening(false);
       onListeningStateChange?.('वीर की Live Voice बंद है');
       return;
@@ -726,7 +729,7 @@ export const FullScreenVoiceMode: React.FC<FullScreenVoiceModeProps> = ({
       onListeningStateChange?.('वीर Live Voice से जुड़ रहा है...');
       await live.start({
         onListening: (active) => { setIsListening(active); if (active) onListeningStateChange?.('वीर सुन रहा है...'); },
-        onSpeaking: (active) => { if (active) onListeningStateChange?.('वीर बोल रहा है...'); },
+        onSpeaking: (active) => { setLiveSpeaking(active); if (active) onListeningStateChange?.('वीर बोल रहा है...'); },
         onTranscript: (text) => setLiveUserPrompt(text),
         onError: (message) => showTemporaryError(message),
       });
@@ -759,6 +762,7 @@ export const FullScreenVoiceMode: React.FC<FullScreenVoiceModeProps> = ({
     void liveVoiceRef.current?.stop();
     liveVoiceRef.current = null;
     setLiveVoiceActive(false);
+    setLiveSpeaking(false);
     setIsListening(false);
     soundFx.playPowerDown();
     isOpenRef.current = false;
@@ -790,7 +794,7 @@ export const FullScreenVoiceMode: React.FC<FullScreenVoiceModeProps> = ({
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_rgba(18,45,105,0.18)_0%,_transparent_62%)]" />
         <div
           className={`absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[min(38vw,250px)] h-[min(38vw,250px)] rounded-full transition-all duration-700 ${
-            isSpeaking
+            displaySpeaking
               ? 'scale-110 shadow-[0_0_110px_rgba(90,145,255,0.55)]'
               : isListening
               ? 'scale-105 shadow-[0_0_95px_rgba(0,205,235,0.42)]'
@@ -840,7 +844,7 @@ export const FullScreenVoiceMode: React.FC<FullScreenVoiceModeProps> = ({
                     <span key={i} style={{ height: `${Math.min(height, 22)}px` }} className="w-1 rounded-full bg-white transition-all duration-75" />
                   ))}
                 </span>
-              ) : isSpeaking ? (
+              ) : displaySpeaking ? (
                 <Volume2 className="w-5 h-5 text-white animate-pulse" />
               ) : isLoading ? (
                 <span className="w-5 h-5 rounded-full border-2 border-white/40 border-t-white animate-spin" />
@@ -849,7 +853,7 @@ export const FullScreenVoiceMode: React.FC<FullScreenVoiceModeProps> = ({
               )}
             </span>
             <span className="flex-1 text-center text-sm font-semibold text-cyan-100 px-3 truncate">
-              {isListening ? 'वीर सुन रहा है...' : isSpeaking ? 'वीर बोल रहा है...' : isLoading ? 'वीर सोच रहा है...' : liveVoiceActive ? 'Live Voice बंद करें' : 'वीर से बात करें'}
+              {displaySpeaking ? 'वीर बोल रहा है...' : isListening ? 'वीर सुन रहा है...' : isLoading ? 'वीर सोच रहा है...' : liveVoiceActive ? 'Live Voice बंद करें' : 'वीर से बात करें'}
             </span>
           </button>
 
