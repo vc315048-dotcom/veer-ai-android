@@ -781,7 +781,7 @@ export const FullScreenVoiceMode: React.FC<FullScreenVoiceModeProps> = ({
       )}
 
       <footer className="absolute bottom-0 left-0 right-0 z-20 px-5 pb-[max(env(safe-area-inset-bottom),20px)]">
-        <div className="mx-auto w-full max-w-xl flex items-center gap-3">
+        <div className="mx-auto w-[82%] max-w-xl flex items-center gap-3">
           <button
             type="button"
             onClick={handlePillOrbClick}
