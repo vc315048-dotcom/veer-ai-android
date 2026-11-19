@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - veer-fixed-source
+      - veer-jarvis-foundation-2026
   workflow_dispatch:
 
 jobs:
