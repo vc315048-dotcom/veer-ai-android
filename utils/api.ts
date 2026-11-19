@@ -1,13 +1,13 @@
 /**
  * API routing for VEER.
  *
- * Android APK requests must reach the deployed Express/Gemini backend.
- * Web builds keep using the same-origin /api routes handled by the server.
- * VITE_API_BASE_URL may override the Android backend at build time.
+ * Android APK requests must reach the Cloud Run backend that was verified
+ * from the user's device with /api/health. Web builds use the same API origin
+ * so chat, TTS, transcription and live-token requests stay on one backend.
+ * VITE_API_BASE_URL may override the backend at build time.
  * Never place a Gemini API key in this client-side file.
  */
-const KNOWN_ANDROID_API_ORIGIN =
-  'https://ais-dev-d6vx7fbb2gwwxyvoxvgwhp-982249227133.asia-east1.run.app';
+const KNOWN_ANDROID_API_ORIGIN = 'https://227133.asia-east1.run.app';
 
 const configuredOrigin = (import.meta.env.VITE_API_BASE_URL || '').trim();
 const apiOrigin = (configuredOrigin || KNOWN_ANDROID_API_ORIGIN).replace(/\/+$/, '');
