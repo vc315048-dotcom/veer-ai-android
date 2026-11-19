@@ -33,8 +33,6 @@ jobs:
         run: npx cap add android
 
       - name: Build web app
-        env:
-          VITE_API_BASE_URL: https://veer-personal-ai-superhero-assistant.ai.studio
         run: npm run build
 
       - name: Sync Android project
