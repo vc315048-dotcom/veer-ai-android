@@ -12,10 +12,11 @@ import { SettingsModal } from './components/SettingsModal';
 import { ChatMessage, VoiceSettings } from './types';
 import { speechManager } from './utils/speechManager';
 import { soundFx } from './utils/soundEffects';
-import { detectVoiceCommand } from './utils/voiceCommands';
+import { detectAppLaunchCommand, detectVoiceCommand } from './utils/voiceCommands';
 import { nativeVoiceService, isNativeAndroid } from './utils/nativeVoiceService';
 import { PhoneControlPanel } from './components/PhoneControlPanel';
 import { apiUrl } from './utils/api';
+import { phoneControl } from './utils/phoneControl';
 
 const STORAGE_KEY_MESSAGES = 'veer_messages_v1';
 const STORAGE_KEY_SETTINGS = 'veer_settings_v1';
@@ -449,6 +450,54 @@ export default function App() {
       } else {
         setStatusText('लगातार सुनना चालू • अब बोलिए');
         scheduleAutoListen();
+      }
+      return;
+    }
+
+    // Explicit Android app-launch commands ("वीर WhatsApp खोलो", "Instagram खोलो").
+    // App launch is allowed; sending or publishing still requires the user's own confirmation.
+    const appCommand = detectAppLaunchCommand(text);
+    if (appCommand && isNativeAndroid()) {
+      try {
+        await phoneControl.openApp(appCommand);
+        const appLabels: Record<string, string> = {
+          whatsapp: 'WhatsApp',
+          instagram: 'Instagram',
+          facebook: 'Facebook',
+          youtube: 'YouTube',
+          chrome: 'Chrome',
+          settings: 'फोन की Settings',
+        };
+        const appMessage: ChatMessage = {
+          id: `veer-open-${Date.now()}`,
+          sender: 'veer',
+          text: `जी साथी, ${appLabels[appCommand]} खोल रहा हूँ।`,
+          timestamp: new Date().toLocaleTimeString('hi-IN', {
+            hour: '2-digit',
+            minute: '2-digit',
+            hour12: true,
+          }),
+        };
+        setMessages((prev) => [...prev, appMessage]);
+        if (voiceSettingsRef.current.autoSpeak) {
+          handlePlayMessage(appMessage);
+        } else {
+          setStatusText(`${appLabels[appCommand]} खोल दिया गया।`);
+        }
+      } catch (error: any) {
+        const errorMessage: ChatMessage = {
+          id: `veer-open-error-${Date.now()}`,
+          sender: 'veer',
+          text: error?.message || 'माफ़ कीजिए साथी, यह ऐप नहीं खुल पाया।',
+          timestamp: new Date().toLocaleTimeString('hi-IN', {
+            hour: '2-digit',
+            minute: '2-digit',
+            hour12: true,
+          }),
+          isError: true,
+        };
+        setMessages((prev) => [...prev, errorMessage]);
+        setStatusText('ऐप खोलने में समस्या आई');
       }
       return;
     }
