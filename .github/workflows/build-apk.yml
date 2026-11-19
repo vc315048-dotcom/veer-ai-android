@@ -7,6 +7,7 @@ on:
     branches:
       - main
       - veer-fixed-source
+      - veer-jarvis-foundation-2026
 
 jobs:
   build:
