@@ -275,7 +275,7 @@ public class VeerVoiceForegroundService extends Service {
                         } else {
                             String normalized = spokenText.trim().toLowerCase(java.util.Locale.ROOT);
                             java.util.regex.Matcher wakeMatcher = java.util.regex.Pattern
-                                    .compile("(वीर\\s*सुनो?|veer\\s*suno?)",
+                                    .compile("(?:वीर(?:\\s*सुनो?)?|veer(?:\\s*suno?)?)",
                                             java.util.regex.Pattern.CASE_INSENSITIVE)
                                     .matcher(normalized);
 
@@ -329,9 +329,22 @@ public class VeerVoiceForegroundService extends Service {
             Intent recognizerIntent = new Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH);
             recognizerIntent.putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL,
                     RecognizerIntent.LANGUAGE_MODEL_FREE_FORM);
-            recognizerIntent.putExtra(RecognizerIntent.EXTRA_LANGUAGE, "hi-IN");
-            recognizerIntent.putExtra(RecognizerIntent.EXTRA_LANGUAGE_PREFERENCE, "hi-IN");
-            recognizerIntent.putExtra(RecognizerIntent.EXTRA_ONLY_RETURN_LANGUAGE_PREFERENCE, "hi-IN");
+            // Android 14+ can detect and switch the spoken language per utterance.
+            // Do not pin the microphone to Hindi: that prevents multilingual speech input.
+            if (Build.VERSION.SDK_INT >= 34) {
+                recognizerIntent.putExtra(RecognizerIntent.EXTRA_ENABLE_LANGUAGE_DETECTION, true);
+                recognizerIntent.putExtra(
+                        RecognizerIntent.EXTRA_ENABLE_LANGUAGE_SWITCH,
+                        RecognizerIntent.LANGUAGE_SWITCH_BALANCED
+                );
+            } else {
+                // Older recognizers use the phone's current language as a fallback.
+                String deviceLanguage = java.util.Locale.getDefault().toLanguageTag();
+                if (deviceLanguage != null && !deviceLanguage.isEmpty()
+                        && !"und".equalsIgnoreCase(deviceLanguage)) {
+                    recognizerIntent.putExtra(RecognizerIntent.EXTRA_LANGUAGE, deviceLanguage);
+                }
+            }
             recognizerIntent.putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true);
             recognizerIntent.putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 3);
 
