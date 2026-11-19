@@ -146,7 +146,7 @@ public class VeerVoiceForegroundService extends Service {
 
         return new NotificationCompat.Builder(this, CHANNEL_ID)
                 .setContentTitle("वीर वॉइस असिस्टेंट सक्रिय है")
-                .setContentText("स्क्रीन बंद होने पर भी आपकी आवाज़ सुन रहा है • वीर से बोलें")
+                .setContentText("स्क्रीन बंद होने पर भी सुन रहा है • केवल “वीर” कहकर आदेश दें")
                 .setSmallIcon(android.R.drawable.ic_btn_speak_now)
                 .setContentIntent(openPendingIntent)
                 .setOngoing(true)
@@ -275,7 +275,7 @@ public class VeerVoiceForegroundService extends Service {
                         } else {
                             String normalized = spokenText.trim().toLowerCase(java.util.Locale.ROOT);
                             java.util.regex.Matcher wakeMatcher = java.util.regex.Pattern
-                                    .compile("(वीर\\s*सुनो?|veer\\s*suno?)",
+                                    .compile("^\\s*(?:वीर|veer)(?:\\s+(?:सुनो?|suno?))?",
                                             java.util.regex.Pattern.CASE_INSENSITIVE)
                                     .matcher(normalized);
 
