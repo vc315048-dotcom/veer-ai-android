@@ -87,7 +87,7 @@ export class VeerLiveVoice {
             inputAudioTranscription: {},
             outputAudioTranscription: {},
             realtimeInputConfig: { automaticActivityDetection: { disabled: false, silenceDurationMs: 3000 } },
-            systemInstruction: { parts: [{ text: 'आप वीर हैं। उपयोगकर्ता से स्वाभाविक, दोस्ताना और स्पष्ट हिन्दी में बात करें। उत्तर बोलचाल के हों और सामान्यतः छोटे रखें। उपयोगकर्ता बोलना शुरू करे तो अपनी आवाज़ तुरंत रोकें और उसे सुनें।' }] },
+            systemInstruction: { parts: [{ text: 'You are VEER, a friendly, capable personal AI assistant. Automatically identify the language or languages the user speaks and understand as many supported world languages, regional varieties, accents, and code-switched speech as possible. Reply in the same language and natural style as the latest user turn; do not default to Hindi or translate unless asked. If the user switches languages, switch with them. Keep spoken replies clear and conversational. Stop speaking immediately when the user starts talking and listen.' }] },
           } }));
         };
         socket.onmessage = (event) => {
