@@ -5,6 +5,8 @@
 
 export type VoiceCommandType = 'pause' | 'resume';
 
+export type AppLaunchCommand = 'whatsapp' | 'instagram' | 'facebook' | 'youtube' | 'chrome' | 'settings';
+
 /**
  * Recognizes built-in VEER hands-free control commands in spoken or written Hindi / Hinglish.
  *
@@ -38,5 +40,37 @@ export function detectVoiceCommand(text: string): VoiceCommandType | null {
     return 'resume';
   }
 
+  return null;
+}
+
+
+/**
+ * Detect explicit app-launch requests for Android hands-free control.
+ * This only opens the requested app; it never sends messages or publishes content.
+ */
+export function detectAppLaunchCommand(text: string): AppLaunchCommand | null {
+  if (!text) return null;
+
+  const cleaned = text
+    .toLowerCase()
+    .replace(/[।,!?.…\-_'"()]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+  const openIntent = /(?:खोलो|खोल दो|खोलिए|ओपन करो|चालू करो|शुरू करो|open|launch|kholo|khol do)/i;
+  if (!openIntent.test(cleaned)) return null;
+
+  const appPatterns: Array<[AppLaunchCommand, RegExp]> = [
+    ['whatsapp', /(?:whats\s*app|whatsapp|व्हाट्स\s*ऐप|व्हाट्सएप|व्हाट्सऐप)/i],
+    ['instagram', /(?:instagram|इंस्टाग्राम|इन्स्टाग्राम)/i],
+    ['facebook', /(?:facebook|फेसबुक)/i],
+    ['youtube', /(?:youtube|यूट्यूब|यू ट्यूब)/i],
+    ['chrome', /(?:chrome|क्रोम|गूगल क्रोम)/i],
+    ['settings', /(?:फोन सेटिंग|सेटिंग्स|settings|setting)/i],
+  ];
+
+  for (const [command, pattern] of appPatterns) {
+    if (pattern.test(cleaned)) return command;
+  }
   return null;
 }
